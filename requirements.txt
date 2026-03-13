@@ -10,3 +10,6 @@ uvicorn
 shap
 evidently
 joblib
+dagshub
+xgboost
+python-multipart

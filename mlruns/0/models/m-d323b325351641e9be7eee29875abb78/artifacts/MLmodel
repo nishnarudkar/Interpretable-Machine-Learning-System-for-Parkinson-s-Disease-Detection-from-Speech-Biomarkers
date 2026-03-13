@@ -1,0 +1,24 @@
+artifact_path: "file:C:/Users/Asus/OneDrive/Desktop/Interpretable Machine Learning\
+  \ System for Parkinson\u2019s Disease Detection from Speech Biomarkers/mlruns/0/models/m-d323b325351641e9be7eee29875abb78/artifacts"
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.13.3
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.6.1
+    skops_trusted_types: null
+mlflow_version: 3.10.1
+model_id: m-d323b325351641e9be7eee29875abb78
+model_size_bytes: 120081
+model_uuid: m-d323b325351641e9be7eee29875abb78
+prompts: null
+run_id: c6dd55c82fcc48d1ac8c6077615750dd
+utc_time_created: '2026-03-13 13:11:14.553432'

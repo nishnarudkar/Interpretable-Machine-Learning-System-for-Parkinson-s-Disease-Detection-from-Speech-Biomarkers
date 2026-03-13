@@ -2,78 +2,49 @@
 <html>
 
 <head>
-
-    <title>Parkinson Detection System</title>
-
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
+<title>Parkinson Detection System</title>
+<link rel="stylesheet" href="/static/style.css">
 </head>
 
-<body class="container mt-4">
+<body>
 
-    <h2>Parkinson Detection ML System</h2>
+<h1>Parkinson Detection System</h1>
 
-    <ul class="nav nav-tabs">
+<div class="tabs">
 
-        <li class="nav-item">
-            <a class="nav-link active" data-bs-toggle="tab" href="#prediction">Prediction</a>
-        </li>
+<button onclick="openTab('importance')">Feature Importance</button>
+<button onclick="openTab('bias')">Bias Variance</button>
+<button onclick="openTab('prediction')">Prediction</button>
 
-        <li class="nav-item">
-            <a class="nav-link" data-bs-toggle="tab" href="#importance">Feature Importance</a>
-        </li>
+</div>
 
-        <li class="nav-item">
-            <a class="nav-link" data-bs-toggle="tab" href="#bias">Bias-Variance</a>
-        </li>
+<div id="importance" class="tabcontent">
 
-    </ul>
+<h2>Feature Importance</h2>
+<img src="/static/feature_importance.png" width="600">
 
-    <div class="tab-content mt-3">
+</div>
 
-        <div class="tab-pane fade show active" id="prediction">
+<div id="bias" class="tabcontent">
 
-            <h4>Enter 26 Feature Values</h4>
+<h2>Bias Variance Curve</h2>
+<img src="/static/learning_curve.png" width="600">
 
-            <form action="/predict" method="post">
+</div>
 
-                <input type="text" name="features" class="form-control" placeholder="comma separated 26 features">
+<div id="prediction" class="tabcontent">
 
-                <br>
+<h2>Prediction</h2>
 
-                <button class="btn btn-primary">Predict</button>
+<input id="inputFeatures" placeholder="Enter features separated by comma">
 
-            </form>
+<button onclick="predict()">Predict</button>
 
-            {% if prediction %}
+<p id="result"></p>
 
-            <h4 class="mt-3">Result: {{ prediction }}</h4>
+</div>
 
-            {% endif %}
-
-        </div>
-
-
-        <div class="tab-pane fade" id="importance">
-
-            <h4>Feature Importance</h4>
-
-            <img src="/static/feature_importance.png" width="700">
-
-        </div>
-
-
-        <div class="tab-pane fade" id="bias">
-
-            <h4>Bias-Variance Curve</h4>
-
-            <img src="/static/learning_curve.png" width="700">
-
-        </div>
-
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/script.js"></script>
 
 </body>
 
