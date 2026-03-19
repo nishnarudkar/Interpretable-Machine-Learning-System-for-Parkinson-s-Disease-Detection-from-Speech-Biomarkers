@@ -1,83 +1,129 @@
-function openTab(tab){
-
-    let tabs = document.getElementsByClassName("tabcontent");
-
-    for(let i = 0; i < tabs.length; i++){
-        tabs[i].style.display = "none";
-    }
-
-    document.getElementById(tab).style.display = "block";
+// ── Tab switching ──
+function openTab(tab, btn) {
+  document.querySelectorAll(".tabcontent").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
+  document.getElementById(tab).classList.add("active");
+  if (btn) btn.classList.add("active");
 }
 
+// ── Prediction ──
+async function predict() {
+  const input = document.getElementById("inputFeatures").value.trim();
+  if (!input) return;
 
-async function predict(){
+  const features = input.split(",").map(Number);
+  if (features.some(isNaN)) {
+    showError("Please enter valid comma-separated numbers.");
+    return;
+  }
 
-    let input = document.getElementById("inputFeatures").value;
+  setLoading(true);
 
-    let features = input.split(",").map(Number);
-
-    let response = await fetch("/predict",{
-
-        method:"POST",
-
-        headers:{
-            "Content-Type":"application/json"
-        },
-
-        body: JSON.stringify({
-            features: features
-        })
-
+  try {
+    const response = await fetch("/predict", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ features })
     });
 
-    let data = await response.json();
+    if (!response.ok) throw new Error("Server error: " + response.status);
 
-    // show prediction
-    document.getElementById("result").innerHTML =
-        "Prediction: " + (data.prediction === 1 ? "Parkinson Detected" : "Healthy")
-        + "<br>Probability: " + (data.probability * 100).toFixed(2) + "%";
-
-    // extract SHAP impacts
-    let shapValues = data.top_contributions.map(item => item.impact);
-
-    let shapLabels = data.top_contributions.map(item => "Feature " + item.feature_index);
-
-    drawShapChart(shapLabels, shapValues);
+    const data = await response.json();
+    renderResult(data);
+    renderShapChart(data.top_contributions);
+  } catch (err) {
+    showError("Prediction failed. Check the server and try again.");
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
 }
 
+function setLoading(on) {
+  const btn = document.querySelector(".predict-btn");
+  const text = document.getElementById("btn-text");
+  const spinner = document.getElementById("btn-spinner");
+  btn.disabled = on;
+  text.textContent = on ? "Running..." : "Run Prediction";
+  spinner.classList.toggle("hidden", !on);
+}
 
-function drawShapChart(labels, values){
+function renderResult(data) {
+  const isParkinson = data.prediction === 1;
+  const prob = data.probability;
 
-    const canvas = document.getElementById("shapChart");
+  const card = document.getElementById("result-card");
+  card.className = "result-card " + (isParkinson ? "parkinson" : "healthy");
+  card.classList.remove("hidden");
 
-    const ctx = canvas.getContext("2d");
+  document.getElementById("result-icon").textContent = isParkinson ? "⚠️" : "✅";
+  document.getElementById("result-label").textContent =
+    isParkinson ? "Parkinson's Detected" : "Healthy";
 
-    // destroy old chart if exists
-    if(window.shapChart){
-        window.shapChart.destroy();
-    }
+  document.getElementById("prob-bar").style.width = (prob * 100).toFixed(1) + "%";
+  document.getElementById("prob-text").textContent =
+    "Confidence: " + (prob * 100).toFixed(1) + "%";
+}
 
-    window.shapChart = new Chart(ctx,{
-        type:'bar',
+function showError(msg) {
+  const card = document.getElementById("result-card");
+  card.className = "result-card parkinson";
+  card.classList.remove("hidden");
+  document.getElementById("result-icon").textContent = "❌";
+  document.getElementById("result-label").textContent = msg;
+  document.getElementById("prob-bar").style.width = "0%";
+  document.getElementById("prob-text").textContent = "";
+}
 
-        data:{
-            labels: labels,
+// ── SHAP Chart ──
+function renderShapChart(contributions) {
+  const section = document.getElementById("shap-section");
+  section.classList.remove("hidden");
 
-            datasets:[{
-                label:"Feature Contribution (SHAP)",
+  const labels = contributions.map(c => `Feature ${c.feature_index}`);
+  const values = contributions.map(c => c.impact);
+  const colors = values.map(v => v >= 0 ? "rgba(248,113,113,0.8)" : "rgba(52,211,153,0.8)");
+  const borders = values.map(v => v >= 0 ? "#f87171" : "#34d399");
 
-                data: values
-            }]
-        },
+  const ctx = document.getElementById("shapChart").getContext("2d");
 
-        options:{
-            responsive:true,
+  if (window._shapChart) window._shapChart.destroy();
 
-            scales:{
-                y:{
-                    beginAtZero:true
-                }
-            }
+  window._shapChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        label: "SHAP Impact",
+        data: values,
+        backgroundColor: colors,
+        borderColor: borders,
+        borderWidth: 1.5,
+        borderRadius: 5,
+      }]
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` Impact: ${ctx.parsed.x.toFixed(4)}`
+          }
         }
-    });
+      },
+      scales: {
+        x: {
+          grid: { color: "rgba(255,255,255,0.05)" },
+          ticks: { color: "#8892b0" },
+          title: { display: true, text: "SHAP Value", color: "#8892b0" }
+        },
+        y: {
+          grid: { display: false },
+          ticks: { color: "#8892b0" }
+        }
+      }
+    }
+  });
 }

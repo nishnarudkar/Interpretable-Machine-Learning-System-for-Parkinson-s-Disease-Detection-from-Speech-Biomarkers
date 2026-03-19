@@ -1,99 +1,125 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-
-<title>Parkinson Detection System</title>
-
-<link rel="stylesheet" href="/static/style.css">
-
-<!-- Chart.js for SHAP visualization -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Parkinson Detection System</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-
 <body>
 
-<h1>Interpretable Parkinson Detection System</h1>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">🧠</span>
+        <div>
+          <h1>Parkinson Detection</h1>
+          <p>Interpretable ML from Speech Biomarkers</p>
+        </div>
+      </div>
+      <div class="badge">XAI · MLflow · SHAP</div>
+    </div>
+  </header>
 
-<div class="tabs">
+  <!-- Nav Tabs -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" onclick="openTab('importance', this)">
+      <span>📊</span> Feature Importance
+    </button>
+    <button class="tab-btn" onclick="openTab('bias', this)">
+      <span>📈</span> Learning Curve
+    </button>
+    <button class="tab-btn" onclick="openTab('prediction', this)">
+      <span>🔬</span> Prediction
+    </button>
+  </nav>
 
-<button onclick="openTab('importance')">Feature Importance</button>
-<button onclick="openTab('bias')">Bias-Variance Curve</button>
-<button onclick="openTab('prediction')">Prediction</button>
+  <main class="main">
 
-</div>
+    <!-- Feature Importance Tab -->
+    <div id="importance" class="tabcontent">
+      <div class="card">
+        <div class="card-header">
+          <h2>Global Feature Importance (SHAP)</h2>
+          <p>Top 20 speech biomarkers ranked by their average SHAP contribution to the model's predictions.</p>
+        </div>
+        <div class="img-wrapper">
+          <img src="/static/feature_importance.png" alt="SHAP Feature Importance Chart" />
+        </div>
+      </div>
+    </div>
 
-<!-- ================= FEATURE IMPORTANCE ================= -->
+    <!-- Learning Curve Tab -->
+    <div id="bias" class="tabcontent">
+      <div class="card">
+        <div class="card-header">
+          <h2>Bias-Variance Learning Curve</h2>
+          <p>Model performance as training data increases — helps diagnose overfitting or underfitting.</p>
+        </div>
+        <div class="img-wrapper">
+          <img src="/static/learning_curve.png" alt="Learning Curve Chart" />
+        </div>
+      </div>
+    </div>
 
-<div id="importance" class="tabcontent">
+    <!-- Prediction Tab -->
+    <div id="prediction" class="tabcontent">
+      <div class="card">
+        <div class="card-header">
+          <h2>Parkinson's Disease Prediction</h2>
+          <p>Enter comma-separated speech feature values to get a prediction with SHAP-based explanation.</p>
+        </div>
 
-<h2>Global Feature Importance (SHAP)</h2>
+        <div class="input-section">
+          <label for="inputFeatures">Speech Feature Vector</label>
+          <textarea
+            id="inputFeatures"
+            rows="4"
+            placeholder="Example: 0.85,0.71,0.57,240,239,0.003,0.0004,0.01,..."
+          ></textarea>
+          <button class="predict-btn" onclick="predict()">
+            <span id="btn-text">Run Prediction</span>
+            <span id="btn-spinner" class="spinner hidden"></span>
+          </button>
+        </div>
 
-<p>
-This chart shows the most influential speech biomarkers used by the model.
-</p>
+        <!-- Result Card -->
+        <div id="result-card" class="result-card hidden">
+          <div id="result-icon" class="result-icon"></div>
+          <div class="result-details">
+            <div id="result-label" class="result-label"></div>
+            <div class="prob-bar-wrapper">
+              <div class="prob-bar-track">
+                <div id="prob-bar" class="prob-bar"></div>
+              </div>
+              <span id="prob-text" class="prob-text"></span>
+            </div>
+          </div>
+        </div>
 
-<img src="/static/feature_importance.png" width="800">
+        <!-- SHAP Chart -->
+        <div id="shap-section" class="shap-section hidden">
+          <h3>Top Feature Contributions (SHAP)</h3>
+          <p class="shap-desc">Positive values push toward Parkinson's; negative values push toward Healthy.</p>
+          <div class="chart-wrapper">
+            <canvas id="shapChart"></canvas>
+          </div>
+        </div>
 
-</div>
+      </div>
+    </div>
 
+  </main>
 
-<!-- ================= BIAS VARIANCE ================= -->
+  <footer class="footer">
+    <p>Powered by XGBoost · SHAP · MLflow · FastAPI &nbsp;|&nbsp; For research purposes only</p>
+  </footer>
 
-<div id="bias" class="tabcontent">
-
-<h2>Model Bias-Variance Curve</h2>
-
-<p>
-This learning curve shows how model performance changes as training data increases.
-</p>
-
-<img src="/static/learning_curve.png" width="800">
-
-</div>
-
-
-<!-- ================= PREDICTION ================= -->
-
-<div id="prediction" class="tabcontent">
-
-<h2>Parkinson Prediction</h2>
-
-<p>
-Enter speech feature values separated by commas.
-</p>
-
-<textarea 
-id="inputFeatures"
-rows="4"
-cols="80"
-placeholder="Example: 0.85,0.71,0.57,240,239,...">
-</textarea>
-
-<br><br>
-
-<button onclick="predict()">Predict</button>
-
-<h3 id="result"></h3>
-
-<h3>Prediction Explanation</h3>
-
-<canvas id="shapChart" width="800" height="400"></canvas>
-
-</div>
-
-
-<script src="/static/script.js"></script>
-
-<script>
-
-document.addEventListener("DOMContentLoaded", function() {
-    openTab("importance");
-});
-
-</script>
-
+  <script src="/static/script.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => openTab("importance", document.querySelector(".tab-btn")));
+  </script>
 </body>
-
 </html>
