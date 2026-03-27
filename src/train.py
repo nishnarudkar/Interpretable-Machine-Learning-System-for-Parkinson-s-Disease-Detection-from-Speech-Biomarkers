@@ -10,6 +10,8 @@ from src.config import (
     MODEL_PATH, SCALER_PATH, SELECTOR_PATH, FEATURE_NAMES_PATH,
 )
 
+COLUMN_ORDER_PATH = MODELS_DIR / "column_order.pkl"
+
 # Suppress MLflow pickle serialisation warning — expected for sklearn models
 warnings.filterwarnings(
     "ignore",
@@ -428,6 +430,8 @@ joblib.dump(best_model,             MODEL_PATH)
 joblib.dump(scaler,                 SCALER_PATH)
 joblib.dump(selector,               SELECTOR_PATH)
 joblib.dump(selected_feature_names, FEATURE_NAMES_PATH)
+joblib.dump(list(X.columns),        COLUMN_ORDER_PATH)   # exact column order for API alignment
 
 print(f"\nBest model saved — Macro F1: {best_f1:.4f}")
 print(f"Saved feature names: {len(selected_feature_names)} features")
+print(f"Saved column order:  {len(list(X.columns))} columns")

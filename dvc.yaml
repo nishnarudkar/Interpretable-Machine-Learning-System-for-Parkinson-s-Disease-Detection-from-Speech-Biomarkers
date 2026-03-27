@@ -10,6 +10,7 @@ stages:
       - models/scaler.pkl
       - models/selector.pkl
       - models/feature_names.pkl
+      - models/column_order.pkl
 
   explain:
     cmd: python src/explain.py

@@ -17,6 +17,10 @@ from src.config import (
     MODEL_PATH, SCALER_PATH, SELECTOR_PATH, FEATURE_NAMES_PATH,
     TEMPLATES_DIR, STATIC_DIR, EXPECTED_RAW_FEATURES,
 )
+
+# Path for the saved column order (set alongside other model artifacts)
+from src.config import MODELS_DIR
+COLUMN_ORDER_PATH = MODELS_DIR / "column_order.pkl"
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier
@@ -35,6 +39,18 @@ try:
     scaler         = joblib.load(SCALER_PATH)
     selector       = joblib.load(SELECTOR_PATH)
     feature_names  = joblib.load(FEATURE_NAMES_PATH)
+    column_order   = joblib.load(COLUMN_ORDER_PATH)   # list of 753 column names in training order
+
+    # Validate the preprocessing chain is internally consistent
+    assert len(column_order) == EXPECTED_RAW_FEATURES, (
+        f"column_order has {len(column_order)} entries, expected {EXPECTED_RAW_FEATURES}"
+    )
+    assert selector.n_features_in_ == EXPECTED_RAW_FEATURES, (
+        f"selector expects {selector.n_features_in_} features, expected {EXPECTED_RAW_FEATURES}"
+    )
+    assert scaler.n_features_in_ == len(feature_names), (
+        f"scaler expects {scaler.n_features_in_} features but feature_names has {len(feature_names)}"
+    )
 
     if isinstance(model, TREE_MODELS):
         explainer = shap.TreeExplainer(model)
@@ -81,7 +97,15 @@ def home(request: Request):
 @app.post("/predict")
 def predict(data: FeatureInput):
     try:
-        arr = np.array(data.features, dtype=np.float64).reshape(1, -1)
+        import pandas as pd
+        # Align input to the exact column order seen during training.
+        # This prevents silent wrong-feature selection if the caller
+        # sends features in a different order.
+        arr_df = pd.DataFrame(
+            [data.features],
+            columns=column_order,
+        )
+        arr = arr_df.values  # shape (1, 753), columns in training order
 
         # Preprocessing: select → scale  (matches train.py order)
         arr_selected = selector.transform(arr)          # 753 → 100 features
