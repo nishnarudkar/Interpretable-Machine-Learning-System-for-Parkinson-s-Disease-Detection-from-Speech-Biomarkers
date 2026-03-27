@@ -396,30 +396,21 @@ with mlflow.start_run(run_name="XGBoost_tuned") as run:
     mlflow.sklearn.log_model(best_tuned_xgb, name="model")
     xgb_run_id = run.info.run_id
 
-    if xgb_metrics["macro_f1"] > best_f1:
+    # Always register XGBoost — done inside the active run so the artifact
+    # URI resolves correctly against the DagsHub remote tracking server.
+    try:
         mlflow.register_model(
             model_uri=f"runs:/{xgb_run_id}/model",
             name="parkinson_detection_model",
         )
+        print(f"Registered XGBoost as 'parkinson_detection_model' (run {xgb_run_id})")
+    except Exception as e:
+        print(f"Model registration skipped: {e}")
 
 if xgb_metrics["macro_f1"] > best_f1:
     best_f1     = xgb_metrics["macro_f1"]
     best_model  = best_tuned_xgb
     best_run_id = xgb_run_id
-
-
-# --------------------------------
-# Register best baseline model if XGBoost didn't win
-# --------------------------------
-def try_register(run_id, name="parkinson_detection_model"):
-    try:
-        mlflow.register_model(f"runs:/{run_id}/model", name)
-        print(f"Registered model from run {run_id}")
-    except Exception as e:
-        print(f"Model registration skipped: {e}")
-
-if best_run_id != xgb_run_id:
-    try_register(best_run_id)
 
 
 # --------------------------------
@@ -435,15 +426,6 @@ production_model = best_tuned_xgb
 print(f"\nLeaderboard winner:  {type(best_model).__name__} (macro F1: {best_f1:.4f})")
 print(f"Production model:    XGBoost_tuned (macro F1: {xgb_metrics['macro_f1']:.4f})")
 print(f"Reason: XGBoost selected for interpretability (SHAP TreeExplainer) in medical context.")
-
-# Always register XGBoost in the model registry as the production model
-try:
-    mlflow.register_model(
-        model_uri=f"runs:/{xgb_run_id}/model",
-        name="parkinson_detection_model",
-    )
-except Exception as e:
-    print(f"Model registration skipped: {e}")
 os.makedirs(MODELS_DIR, exist_ok=True)
 joblib.dump(production_model,       MODEL_PATH)
 joblib.dump(scaler,                 SCALER_PATH)
