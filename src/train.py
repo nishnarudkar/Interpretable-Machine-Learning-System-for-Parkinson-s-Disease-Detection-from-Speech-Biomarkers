@@ -1,4 +1,12 @@
 import os
+import warnings
+
+# Suppress MLflow pickle serialisation warning — expected for sklearn models
+warnings.filterwarnings(
+    "ignore",
+    message="Saving scikit-learn models in the pickle",
+    category=UserWarning,
+)
 
 # ── Credentials from environment variables (never hardcode secrets) ───────────
 DAGSHUB_TRACKING_URI = (
@@ -137,7 +145,7 @@ def log_run(run_name, model_obj, params, X_tr, y_tr, X_te, y_te):
 
         mlflow.log_params(params)
         mlflow.log_metrics(metrics)
-        mlflow.sklearn.log_model(model_obj, artifact_path="model")
+        mlflow.sklearn.log_model(model_obj, name="model")
 
         print(f"\n{run_name}:")
         for k, v in metrics.items():
@@ -153,12 +161,12 @@ def log_run(run_name, model_obj, params, X_tr, y_tr, X_te, y_te):
 print("\n--- Tuning Logistic Regression ---")
 lr_pipeline = ImbPipeline([
     ("smote", SMOTE(random_state=42)),
-    ("lr",    LogisticRegression(random_state=42, max_iter=2000)),
+    ("lr",    LogisticRegression(random_state=42, max_iter=5000)),
 ])
 lr_param_dist = {
-    "lr__C":       uniform(0.01, 10),
-    "lr__solver":  ["lbfgs", "saga"],
-    "lr__penalty": ["l2"],
+    "lr__C":      uniform(0.01, 10),
+    "lr__solver": ["lbfgs", "saga"],
+    # penalty removed — deprecated in sklearn 1.8; regularisation controlled by C alone
 }
 lr_search = RandomizedSearchCV(
     lr_pipeline, lr_param_dist, n_iter=20,
@@ -177,7 +185,7 @@ with mlflow.start_run(run_name="LogisticRegression") as run:
     params.update({"model": "LogisticRegression", "num_features": 100})
     mlflow.log_params(params)
     mlflow.log_metrics(lr_metrics)
-    mlflow.sklearn.log_model(best_lr_pipeline.named_steps["lr"], artifact_path="model")
+    mlflow.sklearn.log_model(best_lr_pipeline.named_steps["lr"], name="model")
     lr_run_id = run.info.run_id
 
 print(f"\nLogisticRegression: {lr_metrics}")
@@ -220,7 +228,7 @@ with mlflow.start_run(run_name="RandomForest") as run:
     params.update({"model": "RandomForest", "num_features": 100})
     mlflow.log_params(params)
     mlflow.log_metrics(rf_metrics)
-    mlflow.sklearn.log_model(best_rf_pipeline.named_steps["rf"], artifact_path="model")
+    mlflow.sklearn.log_model(best_rf_pipeline.named_steps["rf"], name="model")
     rf_run_id = run.info.run_id
 
 print(f"\nRandomForest: {rf_metrics}")
@@ -262,7 +270,7 @@ with mlflow.start_run(run_name="SVM") as run:
     params.update({"model": "SVM", "num_features": 100})
     mlflow.log_params(params)
     mlflow.log_metrics(svm_metrics)
-    mlflow.sklearn.log_model(best_svm_pipeline.named_steps["svm"], artifact_path="model")
+    mlflow.sklearn.log_model(best_svm_pipeline.named_steps["svm"], name="model")
     svm_run_id = run.info.run_id
 
 print(f"\nSVM: {svm_metrics}")
@@ -304,7 +312,7 @@ with mlflow.start_run(run_name="KNN") as run:
     params.update({"model": "KNN", "num_features": 100})
     mlflow.log_params(params)
     mlflow.log_metrics(knn_metrics)
-    mlflow.sklearn.log_model(best_knn_pipeline.named_steps["knn"], artifact_path="model")
+    mlflow.sklearn.log_model(best_knn_pipeline.named_steps["knn"], name="model")
     knn_run_id = run.info.run_id
 
 print(f"\nKNN: {knn_metrics}")
@@ -347,7 +355,7 @@ with mlflow.start_run(run_name="DecisionTree") as run:
     params.update({"model": "DecisionTree", "num_features": 100})
     mlflow.log_params(params)
     mlflow.log_metrics(dt_metrics)
-    mlflow.sklearn.log_model(best_dt_pipeline.named_steps["dt"], artifact_path="model")
+    mlflow.sklearn.log_model(best_dt_pipeline.named_steps["dt"], name="model")
     dt_run_id = run.info.run_id
 
 print(f"\nDecisionTree: {dt_metrics}")
@@ -411,7 +419,7 @@ with mlflow.start_run(run_name="XGBoost_tuned") as run:
     best_params["num_features"] = 100
     mlflow.log_params(best_params)
     mlflow.log_metrics(xgb_metrics)
-    mlflow.sklearn.log_model(best_tuned_xgb, artifact_path="model")
+    mlflow.sklearn.log_model(best_tuned_xgb, name="model")
     xgb_run_id = run.info.run_id
 
     if xgb_metrics["macro_f1"] > best_f1:
