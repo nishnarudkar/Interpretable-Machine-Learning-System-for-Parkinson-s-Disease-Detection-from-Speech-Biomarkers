@@ -113,7 +113,7 @@ def log_run(run_name, model_name, params, X_tr, y_tr, X_te, use_scaled=False):
         mlflow.log_metric("recall",    recall)
         mlflow.log_metric("macro_f1",  f1)
         mlflow.log_metric("roc_auc",   roc_auc)
-        mlflow.sklearn.log_model(model_obj, name="model")
+        mlflow.sklearn.log_model(model_obj, artifact_path="model")
 
         print(f"{run_name}: acc={acc:.4f}  macro_f1={f1:.4f}  roc_auc={roc_auc:.4f}")
         print(classification_report(y_test, pred))
@@ -252,20 +252,32 @@ with mlflow.start_run(run_name="XGBoost_tuned") as run:
     mlflow.log_metric("recall",    recall_score(y_test, y_pred_tuned))
     mlflow.log_metric("macro_f1",  f1_xgb)
     mlflow.log_metric("roc_auc",   roc_auc_xgb)
-    mlflow.sklearn.log_model(best_tuned_xgb, name="model")
+    mlflow.sklearn.log_model(best_tuned_xgb, artifact_path="model")
     xgb_run_id = run.info.run_id
 
+    # Register inside the active run so the artifact URI is guaranteed to resolve
+    if f1_xgb > best_f1:
+        mlflow.register_model(
+            model_uri=f"runs:/{xgb_run_id}/model",
+            name="parkinson_detection_model"
+        )
+
 if f1_xgb > best_f1:
-    best_f1     = f1_xgb
-    best_model  = best_tuned_xgb
+    best_f1    = f1_xgb
+    best_model = best_tuned_xgb
     best_run_id = xgb_run_id
 
 
 # --------------------------------
-# Register best model
+# Register best model (baseline winner so far)
+# Done after all runs so we have the correct best_run_id
 # --------------------------------
-model_uri = f"runs:/{best_run_id}/model"
-mlflow.register_model(model_uri, "parkinson_detection_model")
+def try_register(run_id, name="parkinson_detection_model"):
+    try:
+        mlflow.register_model(f"runs:/{run_id}/model", name)
+        print(f"Registered model from run {run_id}")
+    except Exception as e:
+        print(f"Model registration skipped: {e}")
 
 
 # --------------------------------
@@ -275,5 +287,10 @@ os.makedirs("models", exist_ok=True)
 joblib.dump(best_model, "models/model.pkl")
 joblib.dump(scaler,     "models/scaler.pkl")
 joblib.dump(selector,   "models/selector.pkl")
+
+# Register the overall best (XGBoost already registered inside its run if it won)
+# For baseline winners, register here
+if best_run_id != xgb_run_id:
+    try_register(best_run_id)
 
 print(f"\nBest model saved — Macro F1: {best_f1:.4f}")
