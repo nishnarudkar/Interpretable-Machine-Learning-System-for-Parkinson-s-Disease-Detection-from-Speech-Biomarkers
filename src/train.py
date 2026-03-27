@@ -425,13 +425,32 @@ if best_run_id != xgb_run_id:
 # --------------------------------
 # Save artifacts for API
 # --------------------------------
+# XGBoost is always used as the production model regardless of leaderboard rank.
+# Rationale: this is a medical application where interpretability is critical.
+# XGBoost supports fast, exact SHAP (TreeExplainer) which provides meaningful
+# biomarker explanations. KNN/SVM may score marginally higher on some metrics
+# but offer no native feature attribution — only slow KernelExplainer approximations.
+# All models are still logged to MLflow for full comparison.
+production_model = best_tuned_xgb
+print(f"\nLeaderboard winner:  {type(best_model).__name__} (macro F1: {best_f1:.4f})")
+print(f"Production model:    XGBoost_tuned (macro F1: {xgb_metrics['macro_f1']:.4f})")
+print(f"Reason: XGBoost selected for interpretability (SHAP TreeExplainer) in medical context.")
+
+# Always register XGBoost in the model registry as the production model
+try:
+    mlflow.register_model(
+        model_uri=f"runs:/{xgb_run_id}/model",
+        name="parkinson_detection_model",
+    )
+except Exception as e:
+    print(f"Model registration skipped: {e}")
 os.makedirs(MODELS_DIR, exist_ok=True)
-joblib.dump(best_model,             MODEL_PATH)
+joblib.dump(production_model,       MODEL_PATH)
 joblib.dump(scaler,                 SCALER_PATH)
 joblib.dump(selector,               SELECTOR_PATH)
 joblib.dump(selected_feature_names, FEATURE_NAMES_PATH)
-joblib.dump(list(X.columns),        COLUMN_ORDER_PATH)   # exact column order for API alignment
+joblib.dump(list(X.columns),        COLUMN_ORDER_PATH)
 
-print(f"\nBest model saved — Macro F1: {best_f1:.4f}")
+print(f"\nProduction model saved: {type(production_model).__name__}")
 print(f"Saved feature names: {len(selected_feature_names)} features")
 print(f"Saved column order:  {len(list(X.columns))} columns")
