@@ -393,19 +393,15 @@ with mlflow.start_run(run_name="XGBoost_tuned") as run:
     best_params["num_features"] = 100
     mlflow.log_params(best_params)
     mlflow.log_metrics(xgb_metrics)
-    mlflow.sklearn.log_model(best_tuned_xgb, name="model")
+    # registered_model_name registers the model in the MLflow Model Registry
+    # in a single atomic call — the correct approach for MLflow 3.x
+    mlflow.sklearn.log_model(
+        best_tuned_xgb,
+        name="model",
+        registered_model_name="parkinson_detection_model",
+    )
     xgb_run_id = run.info.run_id
-
-    # Always register XGBoost — done inside the active run so the artifact
-    # URI resolves correctly against the DagsHub remote tracking server.
-    try:
-        mlflow.register_model(
-            model_uri=f"runs:/{xgb_run_id}/model",
-            name="parkinson_detection_model",
-        )
-        print(f"Registered XGBoost as 'parkinson_detection_model' (run {xgb_run_id})")
-    except Exception as e:
-        print(f"Model registration skipped: {e}")
+    print(f"Logged and registered XGBoost as 'parkinson_detection_model' (run {xgb_run_id})")
 
 if xgb_metrics["macro_f1"] > best_f1:
     best_f1     = xgb_metrics["macro_f1"]
