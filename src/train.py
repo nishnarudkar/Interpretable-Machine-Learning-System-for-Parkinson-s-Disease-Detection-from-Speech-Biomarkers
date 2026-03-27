@@ -110,15 +110,6 @@ X_test_sel_scaled  = scaler.transform(X_test_sel)
 
 
 # --------------------------------
-# SMOTE on selected features for training
-# (kept for XGBoost pipeline compatibility)
-# --------------------------------
-smote = SMOTE(random_state=42)
-X_train_sel_smote,    y_train_smote = smote.fit_resample(X_train_sel,        y_train)
-X_train_scaled_smote, _             = smote.fit_resample(X_train_sel_scaled, y_train)
-
-
-# --------------------------------
 # Helper: compute all metrics (all macro-averaged for consistency)
 # --------------------------------
 def compute_metrics(y_true, y_pred, y_prob):
