@@ -15,8 +15,10 @@ WORKDIR /app
 COPY --from=builder /root/.local /root/.local
 ENV PATH=/root/.local/bin:$PATH
 
-# Copy only what the API needs
+# Copy only what the API needs at runtime
 COPY api/        api/
+COPY src/config.py   src/config.py
+COPY src/__init__.py src/__init__.py
 COPY models/     models/
 COPY static/     static/
 COPY templates/  templates/
