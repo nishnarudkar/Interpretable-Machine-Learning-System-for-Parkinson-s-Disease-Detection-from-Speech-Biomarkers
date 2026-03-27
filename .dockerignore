@@ -1,0 +1,31 @@
+# Source / training code (not needed at runtime)
+src/
+notebooks/
+data/
+mlruns/
+mlflow.db
+.dvc/
+.git/
+.gitignore
+.dockerignore
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Dev / CI files
+Jenkinsfile
+README.md
+requirements.txt
+dvc.yaml
+*.dvc
+
+# OS
+.DS_Store
+Thumbs.db

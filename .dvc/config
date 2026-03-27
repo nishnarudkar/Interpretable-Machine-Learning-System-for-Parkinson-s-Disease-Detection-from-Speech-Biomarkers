@@ -3,5 +3,3 @@
 ['remote "origin"']
     url = https://dagshub.com/nishnarudkar/Interpretable-Machine-Learning-System-for-Parkinson-s-Disease-Detection-from-Speech-Biomarkers.dvc
     auth = basic
-    user = nishnarudkar
-    password = fad6df01b35858789327a0e48a1d0c5e0f07a4b9

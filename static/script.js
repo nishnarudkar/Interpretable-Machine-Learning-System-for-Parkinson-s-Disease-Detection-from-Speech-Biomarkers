@@ -80,7 +80,7 @@ function renderShapChart(contributions) {
   const section = document.getElementById("shap-section");
   section.classList.remove("hidden");
 
-  const labels = contributions.map(c => `Feature ${c.feature_index}`);
+  const labels = contributions.map(c => c.feature_name || `Feature ${c.feature_index}`);
   const values = contributions.map(c => c.impact);
   const colors = values.map(v => v >= 0 ? "rgba(248,113,113,0.8)" : "rgba(52,211,153,0.8)");
   const borders = values.map(v => v >= 0 ? "#f87171" : "#34d399");

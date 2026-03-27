@@ -7,11 +7,25 @@ stages:
       - data/pd_speech_features.csv
     outs:
       - models/model.pkl
+      - models/scaler.pkl
+      - models/selector.pkl
+      - models/feature_names.pkl
 
   explain:
     cmd: python src/explain.py
     deps:
       - src/explain.py
       - models/model.pkl
+      - models/scaler.pkl
+      - models/selector.pkl
     outs:
       - static/feature_importance.png
+
+  learning_curve:
+    cmd: python src/learning_curve.py
+    deps:
+      - src/learning_curve.py
+      - models/model.pkl
+      - data/pd_speech_features.csv
+    outs:
+      - static/learning_curve.png

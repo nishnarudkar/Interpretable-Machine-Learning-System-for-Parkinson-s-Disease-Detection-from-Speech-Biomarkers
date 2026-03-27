@@ -1,31 +1,46 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+from typing import List
 import joblib
 import numpy as np
 import shap
-import pandas as pd
+import os
 
-app = FastAPI()
+app = FastAPI(title="Parkinson Detection API", version="1.0.0")
 
-# templates + static
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# load model artifacts
-model = joblib.load("models/model.pkl")
-scaler = joblib.load("models/scaler.pkl")
-selector = joblib.load("models/selector.pkl")
+# ── Load artifacts at startup ─────────────────────────────────────────────────
+try:
+    model          = joblib.load("models/model.pkl")
+    scaler         = joblib.load("models/scaler.pkl")
+    selector       = joblib.load("models/selector.pkl")
+    feature_names  = joblib.load("models/feature_names.pkl")
+    explainer      = shap.TreeExplainer(model)
+    EXPECTED_FEATURES = 753   # number of raw input features (excluding id/class)
+    print("All model artifacts loaded successfully.")
+except FileNotFoundError as e:
+    raise RuntimeError(
+        f"Model artifact not found: {e}. Run `python src/train.py` first."
+    )
+# ─────────────────────────────────────────────────────────────────────────────
 
-# SHAP explainer
-explainer = shap.TreeExplainer(model)
 
-
-# request schema
 class FeatureInput(BaseModel):
-    features: list
+    features: List[float]
+
+    @field_validator("features")
+    @classmethod
+    def check_length(cls, v):
+        if len(v) != EXPECTED_FEATURES:
+            raise ValueError(
+                f"Expected {EXPECTED_FEATURES} features, got {len(v)}"
+            )
+        return v
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -35,39 +50,46 @@ def home(request: Request):
 
 @app.post("/predict")
 def predict(data: FeatureInput):
-
-    # convert to numpy
     arr = np.array(data.features).reshape(1, -1)
 
-    # apply preprocessing
-    arr_scaled = scaler.transform(arr)
-    arr_selected = selector.transform(arr_scaled)
+    # Preprocessing: select → scale  (matches train.py order)
+    arr_selected = selector.transform(arr)
+    arr_scaled   = scaler.transform(arr_selected)
 
-    # prediction
-    prediction = int(model.predict(arr_selected)[0])
-
-    # probability
-    prob = float(model.predict_proba(arr_selected)[0][1])
+    # Prediction
+    prediction = int(model.predict(arr_scaled)[0])
+    prob       = float(model.predict_proba(arr_scaled)[0][1])
 
     # SHAP explanation
-    shap_values = explainer.shap_values(arr_selected)
+    shap_vals = explainer.shap_values(arr_scaled)
 
-    shap_values = shap_values[0]
+    # Normalise SHAP output across model types
+    if isinstance(shap_vals, list):
+        shap_vals = shap_vals[1]          # RandomForest list → class-1
+    elif isinstance(shap_vals, np.ndarray) and shap_vals.ndim == 3:
+        shap_vals = shap_vals[:, :, 1]    # 3D → class-1 slice
 
-    # top contributing features
-    importance = np.abs(shap_values)
-    top_indices = np.argsort(importance)[-10:][::-1]
+    shap_vals = shap_vals[0]              # shape: (n_selected_features,)
 
+    # Top 10 contributing features with actual names
+    top_indices = np.argsort(np.abs(shap_vals))[-10:][::-1]
     explanation = [
         {
             "feature_index": int(i),
-            "impact": float(shap_values[i])
+            "feature_name":  feature_names[i],
+            "impact":        float(shap_vals[i]),
         }
         for i in top_indices
     ]
 
     return {
-        "prediction": prediction,
-        "probability": prob,
-        "top_contributions": explanation
+        "prediction":       prediction,
+        "label":            "Parkinson's Detected" if prediction == 1 else "Healthy",
+        "probability":      prob,
+        "top_contributions": explanation,
     }
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "model_loaded": model is not None}

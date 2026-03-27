@@ -13,6 +13,9 @@ venv/
 .venv/
 env/
 
+# Model artifacts (tracked via DVC or locally only)
+models/
+
 # MLflow local backend
 mlflow.db
 mlruns/
@@ -20,6 +23,13 @@ mlruns/
 # Data (tracked via DVC)
 data/pd_speech_features.csv
 
+# Generated static assets
+static/feature_importance.png
+static/learning_curve.png
+
+# Secrets — never commit
+.env
+.dvc/config.local
 
 # OS
 .DS_Store
