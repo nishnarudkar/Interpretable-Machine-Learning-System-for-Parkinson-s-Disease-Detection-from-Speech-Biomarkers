@@ -1,5 +1,14 @@
 import os
 import warnings
+import sys
+from pathlib import Path
+
+# Ensure project root is on sys.path so `src.config` resolves from any cwd
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from src.config import (
+    load_dataset, MODELS_DIR,
+    MODEL_PATH, SCALER_PATH, SELECTOR_PATH, FEATURE_NAMES_PATH,
+)
 
 # Suppress MLflow pickle serialisation warning — expected for sklearn models
 warnings.filterwarnings(
@@ -59,12 +68,7 @@ mlflow.set_experiment("parkinson_detection")
 # --------------------------------
 # Load dataset
 # --------------------------------
-df = pd.read_csv("data/pd_speech_features.csv", header=1)
-df = df.drop("id", axis=1)
-
-X = df.drop("class", axis=1)
-y = df["class"]
-
+X, y = load_dataset()
 print(f"Dataset shape: {X.shape}, Class distribution:\n{y.value_counts()}")
 
 
@@ -428,11 +432,11 @@ if best_run_id != xgb_run_id:
 # --------------------------------
 # Save artifacts for API
 # --------------------------------
-os.makedirs("models", exist_ok=True)
-joblib.dump(best_model,             "models/model.pkl")
-joblib.dump(scaler,                 "models/scaler.pkl")
-joblib.dump(selector,               "models/selector.pkl")
-joblib.dump(selected_feature_names, "models/feature_names.pkl")
+os.makedirs(MODELS_DIR, exist_ok=True)
+joblib.dump(best_model,             MODEL_PATH)
+joblib.dump(scaler,                 SCALER_PATH)
+joblib.dump(selector,               SELECTOR_PATH)
+joblib.dump(selected_feature_names, FEATURE_NAMES_PATH)
 
 print(f"\nBest model saved — Macro F1: {best_f1:.4f}")
 print(f"Saved feature names: {len(selected_feature_names)} features")

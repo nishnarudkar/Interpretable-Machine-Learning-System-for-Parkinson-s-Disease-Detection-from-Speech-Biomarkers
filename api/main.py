@@ -7,35 +7,40 @@ from typing import List
 import joblib
 import numpy as np
 import shap
-import os
+import sys
+from pathlib import Path
+
+# Resolve project root so config imports work from any working directory
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from src.config import (
+    load_dataset,
+    MODEL_PATH, SCALER_PATH, SELECTOR_PATH, FEATURE_NAMES_PATH,
+    TEMPLATES_DIR, STATIC_DIR, EXPECTED_RAW_FEATURES,
+)
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier
 
 app = FastAPI(title="Parkinson Detection API", version="1.0.0")
 
-templates = Jinja2Templates(directory="templates")
-app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 TREE_MODELS = (RandomForestClassifier, GradientBoostingClassifier,
                DecisionTreeClassifier, XGBClassifier)
 
 # ── Load artifacts at startup ─────────────────────────────────────────────────
 try:
-    model          = joblib.load("models/model.pkl")
-    scaler         = joblib.load("models/scaler.pkl")
-    selector       = joblib.load("models/selector.pkl")
-    feature_names  = joblib.load("models/feature_names.pkl")
-    EXPECTED_FEATURES = 753
+    model          = joblib.load(MODEL_PATH)
+    scaler         = joblib.load(SCALER_PATH)
+    selector       = joblib.load(SELECTOR_PATH)
+    feature_names  = joblib.load(FEATURE_NAMES_PATH)
 
     if isinstance(model, TREE_MODELS):
         explainer = shap.TreeExplainer(model)
     else:
-        # KernelExplainer: needs a small background dataset
-        # Load a sample of the training data for the background
-        import pandas as pd
-        df = pd.read_csv("data/pd_speech_features.csv", header=1)
-        X_bg = df.drop(["id", "class"], axis=1).sample(50, random_state=42)
+        X_bg, _     = load_dataset()
+        X_bg        = X_bg.sample(50, random_state=42)
         X_bg_sel    = selector.transform(X_bg)
         X_bg_scaled = scaler.transform(X_bg_sel)
         background  = shap.kmeans(X_bg_scaled, 10)
@@ -55,9 +60,9 @@ class FeatureInput(BaseModel):
     @field_validator("features")
     @classmethod
     def check_length(cls, v):
-        if len(v) != EXPECTED_FEATURES:
+        if len(v) != EXPECTED_RAW_FEATURES:
             raise ValueError(
-                f"Expected {EXPECTED_FEATURES} features, got {len(v)}"
+                f"Expected {EXPECTED_RAW_FEATURES} features, got {len(v)}"
             )
         return v
 
