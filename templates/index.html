@@ -62,10 +62,18 @@
       <div class="card">
         <div class="card-header">
           <h2>Bias-Variance Learning Curve</h2>
-          <p>Model performance as training data increases — helps diagnose overfitting or underfitting.</p>
+          <p>This curve shows how model performance improves with more training data and helps analyze bias-variance tradeoff.</p>
         </div>
         <div class="img-wrapper">
           <img src="/static/learning_curve.png" alt="Learning Curve Chart" />
+        </div>
+        <div class="top-features-section">
+          <h3>How to Read This Chart</h3>
+          <ul class="legend-list">
+            <li><span class="legend-dot" style="background:#6c63ff;"></span><strong>Train score</strong> — performance on training data</li>
+            <li><span class="legend-dot" style="background:#34d399;"></span><strong>Validation score</strong> — performance on unseen data</li>
+            <li><span class="legend-dot" style="background:#f87171;"></span><strong>Gap</strong> — large gap indicates overfitting; small gap indicates good generalisation</li>
+          </ul>
         </div>
       </div>
     </div>
