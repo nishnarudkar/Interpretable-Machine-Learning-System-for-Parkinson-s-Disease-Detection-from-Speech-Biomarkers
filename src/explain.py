@@ -5,71 +5,62 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-print("Loading model and preprocessing...")
+print("Loading model and preprocessing artifacts...")
 
-model = joblib.load("models/model.pkl")
-scaler = joblib.load("models/scaler.pkl")
+model    = joblib.load("models/model.pkl")
+scaler   = joblib.load("models/scaler.pkl")
 selector = joblib.load("models/selector.pkl")
 
 print("Loading dataset...")
 
 df = pd.read_csv("data/pd_speech_features.csv", header=1)
+X  = df.drop(["id", "class"], axis=1)
 
-X = df.drop(["id","class"], axis=1)
-
-# sample rows for speed
+# Sample for speed
 X_sample = X.sample(50, random_state=42)
 
-print("Applying preprocessing...")
+print("Applying preprocessing (select → scale, matching train pipeline)...")
 
-X_scaled = scaler.transform(X_sample)
-X_selected = selector.transform(X_scaled)
+# Step 1: feature selection on raw data (matches train.py order)
+X_selected = selector.transform(X_sample)
 
-# recover feature names after SelectKBest
+# Step 2: scale the selected features
+X_scaled = scaler.transform(X_selected)
+
+# Recover feature names for the selected columns
 selected_features = X.columns[selector.get_support()]
 
-print("Creating SHAP explainer...")
-
-explainer = shap.TreeExplainer(model)
+print("Creating SHAP TreeExplainer...")
+explainer  = shap.TreeExplainer(model)
 
 print("Calculating SHAP values...")
+shap_values = explainer.shap_values(X_scaled)
 
-shap_values = explainer.shap_values(X_selected)
+# For binary classifiers that return a list (e.g. RandomForest), take class-1 values
+if isinstance(shap_values, list):
+    shap_values = shap_values[1]
 
-# compute mean absolute SHAP values
+# Mean absolute SHAP across samples
 importance = np.abs(shap_values).mean(axis=0)
 
 feature_importance = pd.DataFrame({
-    "feature": selected_features,
+    "feature":    selected_features,
     "importance": importance
-})
-
-feature_importance = feature_importance.sort_values(
-    by="importance",
-    ascending=False
-)
+}).sort_values("importance", ascending=False)
 
 top_features = feature_importance.head(20)
 
-print("Generating bar chart...")
+print("Generating SHAP bar chart...")
 
-plt.figure(figsize=(10,6))
-
-plt.barh(
-    top_features["feature"],
-    top_features["importance"]
-)
-
+plt.figure(figsize=(10, 6))
+plt.barh(top_features["feature"], top_features["importance"])
 plt.gca().invert_yaxis()
-
-plt.xlabel("SHAP Importance")
-
+plt.xlabel("Mean |SHAP value|")
 plt.title("Top 20 Speech Biomarkers for Parkinson Detection")
+plt.tight_layout()
 
 os.makedirs("static", exist_ok=True)
-
 plt.savefig("static/feature_importance.png", bbox_inches="tight")
-
 plt.close()
 
-print("Saved SHAP importance chart!")
+print("Saved → static/feature_importance.png")

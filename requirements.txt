@@ -12,4 +12,5 @@ evidently
 joblib
 dagshub
 xgboost
+imbalanced-learn
 python-multipart
