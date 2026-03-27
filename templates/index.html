@@ -42,11 +42,17 @@
     <div id="importance" class="tabcontent">
       <div class="card">
         <div class="card-header">
-          <h2>Global Feature Importance (SHAP)</h2>
-          <p>Top 20 speech biomarkers ranked by their average SHAP contribution to the model's predictions.</p>
+          <h2>Top Speech Biomarkers</h2>
+          <p>These features represent key speech characteristics associated with Parkinson's disease.</p>
         </div>
         <div class="img-wrapper">
           <img src="/static/feature_importance.png" alt="SHAP Feature Importance Chart" />
+        </div>
+        <div class="top-features-section">
+          <h3>Top 5 Most Influential Biomarkers</h3>
+          <ol id="top-features-list" class="top-features-list">
+            <li class="top-feature-loading">Loading...</li>
+          </ol>
         </div>
       </div>
     </div>

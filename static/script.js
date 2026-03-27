@@ -4,6 +4,27 @@ function openTab(tab, btn) {
   document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
   document.getElementById(tab).classList.add("active");
   if (btn) btn.classList.add("active");
+  if (tab === "importance") loadTopFeatures();
+}
+
+// ── Top features list ──
+async function loadTopFeatures() {
+  const list = document.getElementById("top-features-list");
+  if (!list || list.dataset.loaded) return;
+  try {
+    const res  = await fetch("/top-features");
+    const data = await res.json();
+    list.innerHTML = data.top_features.map(f =>
+      `<li>
+        <span class="feat-rank">#${f.rank}</span>
+        <span class="feat-name">${f.name}</span>
+        <span class="feat-score">${f.importance.toFixed(4)}</span>
+      </li>`
+    ).join("");
+    list.dataset.loaded = "1";
+  } catch {
+    list.innerHTML = "<li>Could not load features.</li>";
+  }
 }
 
 // ── Prediction ──

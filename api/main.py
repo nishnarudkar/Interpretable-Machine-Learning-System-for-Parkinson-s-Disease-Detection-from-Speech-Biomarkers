@@ -232,3 +232,39 @@ def health():
         "explainer":    type(explainer).__name__,
         "model_loaded": model is not None,
     }
+
+
+@app.get("/top-features")
+def top_features():
+    """Return the top 5 globally important features from the saved SHAP analysis."""
+    try:
+        import shap as _shap
+        import joblib as _joblib
+        from src.config import load_dataset as _load
+
+        _model    = _joblib.load(MODEL_PATH)
+        _scaler   = _joblib.load(SCALER_PATH)
+        _selector = _joblib.load(SELECTOR_PATH)
+        _fnames   = _joblib.load(FEATURE_NAMES_PATH)
+
+        X_all, _ = _load()
+        X_s   = _selector.transform(X_all.sample(100, random_state=42))
+        X_sc  = _scaler.transform(X_s)
+
+        _exp  = _shap.TreeExplainer(_model)
+        sv    = _exp.shap_values(X_sc)
+        if isinstance(sv, list):
+            sv = sv[1]
+        elif hasattr(sv, "ndim") and sv.ndim == 3:
+            sv = sv[:, :, 1]
+
+        importance = np.abs(sv).mean(axis=0)
+        top5_idx   = np.argsort(importance)[::-1][:5]
+        return {
+            "top_features": [
+                {"rank": int(r+1), "name": _fnames[i], "importance": float(importance[i])}
+                for r, i in enumerate(top5_idx)
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
