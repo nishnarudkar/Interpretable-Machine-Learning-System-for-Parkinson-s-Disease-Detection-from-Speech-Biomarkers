@@ -30,12 +30,13 @@ An end-to-end MLOps pipeline that detects Parkinson's disease from voice recordi
 
 Parkinson's disease is a progressive neurological disorder. One of its earliest and most measurable symptoms is changes in speech patterns. This project builds a full MLOps system that:
 
-- Trains and compares multiple classifiers on 753 speech biomarker features
-- Handles class imbalance using **SMOTE** (Synthetic Minority Oversampling Technique)
-- Selects the top 100 most informative features using **SelectKBest** (f_classif)
+- Trains and compares 6 classifiers on 753 speech biomarker features
+- Handles class imbalance using **SMOTE** inside leakage-free `ImbPipeline` CV folds
+- Selects the top 100 most informative features using **SelectFromModel** (RandomForest)
+- Tunes all models with **RandomizedSearchCV** for efficient hyperparameter search
 - Tracks every experiment with **MLflow** synced to **DagsHub**
 - Registers the best model in the **MLflow Model Registry**
-- Generates global and local explanations using **SHAP TreeExplainer**
+- Generates global and local explanations using **SHAP** (TreeExplainer or KernelExplainer depending on model type)
 - Serves predictions and explanations through a **FastAPI** web app with an interactive dark-themed UI
 - Versions the dataset with **DVC** backed by DagsHub remote storage
 - Automates training and deployment via **Jenkins** and **Docker**
@@ -46,7 +47,7 @@ Parkinson's disease is a progressive neurological disorder. One of its earliest 
 
 **File:** `data/pd_speech_features.csv`
 **Size:** ~5.3 MB (DVC tracked)
-**Shape:** 756 rows × 755 columns (754 features + 1 target after dropping `id`)
+**Shape:** 756 rows × 755 columns (753 features + 1 target after dropping `id`)
 
 ### Feature Groups
 
@@ -80,6 +81,7 @@ The dataset is imbalanced (~3:1 ratio), which is addressed using SMOTE during tr
 │   ├── pd_speech_features.csv          # Dataset (DVC tracked)
 │   └── pd_speech_features.csv.dvc      # DVC pointer file
 ├── src/
+│   ├── config.py                       # Central path + dataset config
 │   ├── train.py                        # Model training + MLflow logging
 │   ├── explain.py                      # SHAP global feature importance
 │   └── learning_curve.py               # Bias-variance learning curve
@@ -88,7 +90,9 @@ The dataset is imbalanced (~3:1 ratio), which is addressed using SMOTE during tr
 ├── models/
 │   ├── model.pkl                       # Best trained model
 │   ├── scaler.pkl                      # Fitted StandardScaler
-│   └── selector.pkl                    # Fitted SelectKBest selector
+│   ├── selector.pkl                    # Fitted SelectFromModel selector
+│   ├── feature_names.pkl               # Names of the 100 selected features
+│   └── column_order.pkl                # Training column order for serving alignment
 ├── static/
 │   ├── feature_importance.png          # SHAP bar chart (generated)
 │   ├── learning_curve.png              # Learning curve plot (generated)
@@ -98,11 +102,12 @@ The dataset is imbalanced (~3:1 ratio), which is addressed using SMOTE during tr
 │   └── index.html                      # Jinja2 HTML template
 ├── notebooks/
 │   └── Parkinsons_Detection_MLOPS_Project_SMOTE.ipynb  # Full EDA + experimentation
-├── mlruns/                             # MLflow local experiment store
 ├── dvc.yaml                            # DVC pipeline definition
-├── Dockerfile                          # Container image definition
+├── Dockerfile                          # Multi-stage container image
 ├── Jenkinsfile                         # CI/CD pipeline
-├── requirements.txt                    # Python dependencies
+├── requirements.txt                    # Full training + API dependencies (pinned)
+├── requirements-api.txt                # API-only dependencies for Docker
+├── .env.example                        # Environment variable template
 └── .dvc/config                         # DVC remote (DagsHub)
 ```
 
@@ -112,11 +117,10 @@ The dataset is imbalanced (~3:1 ratio), which is addressed using SMOTE during tr
 
 ### 1. Data Loading
 
+Data is loaded via `src/config.py` which resolves paths relative to the project root (works in Docker, CI, and local dev) and validates the CSV structure:
+
 ```python
-df = pd.read_csv("data/pd_speech_features.csv", header=1)
-df = df.drop("id", axis=1)
-X = df.drop("class", axis=1)   # 753 features
-y = df["class"]                 # binary target
+X, y = load_dataset()   # 753 features, binary target
 ```
 
 ### 2. Train/Test Split
@@ -127,51 +131,59 @@ y = df["class"]                 # binary target
 
 ### 3. Preprocessing
 
-**Feature Selection** — `SelectKBest(f_classif, k=100)`
-- Selects the top 100 features by ANOVA F-statistic
+**Feature Selection** — `SelectFromModel(RandomForestClassifier, max_features=100)`
+- Trains a Random Forest on SMOTE-balanced data to learn feature importances
+- Selects the top 100 features by importance score
 - Reduces dimensionality from 753 → 100 features
 - Fitted only on training data to prevent leakage
 
+```python
+smote_fs = SMOTE(random_state=42)
+X_train_fs, y_train_fs = smote_fs.fit_resample(X_train, y_train)
+
+selector = SelectFromModel(RandomForestClassifier(n_estimators=100), max_features=100)
+selector.fit(X_train_fs, y_train_fs)
+```
+
 **Scaling** — `StandardScaler`
-- Zero mean, unit variance normalization
-- Required for distance-based models (LR, SVM, KNN)
+- Applied after feature selection (select → scale order)
+- Zero mean, unit variance normalization on the 100 selected features
 - Fitted only on training data
 
-### 4. Class Imbalance — SMOTE
+### 4. Class Imbalance — SMOTE inside ImbPipeline
 
-SMOTE is applied **inside the training fold only** to avoid data leakage:
-
-```python
-smote = SMOTE(random_state=42)
-X_train_smote, y_train_smote = smote.fit_resample(X_train_sel, y_train)
-```
-
-This synthetically oversamples the minority class (Healthy) to balance the training distribution.
-
-### 5. Model Training
-
-**Baseline models** trained and logged to MLflow:
-
-| Model | Notes |
-|---|---|
-| Logistic Regression | `max_iter=500`, trained on scaled + SMOTE data |
-| Random Forest | `n_estimators=200`, trained on unscaled + SMOTE data |
-
-**XGBoost hyperparameter tuning** via grid search over 12 combinations:
+SMOTE is applied **inside each model's `ImbPipeline`** during cross-validation to avoid data leakage. It is never applied to the full training set before CV:
 
 ```python
-depth_values    = [3, 5, 7]
-learning_rates  = [0.05, 0.1]
-estimators      = [100, 200]
+pipeline = ImbPipeline([
+    ("smote", SMOTE(random_state=42)),
+    ("model", SomeClassifier()),
+])
+RandomizedSearchCV(pipeline, param_dist, cv=StratifiedKFold(5), ...)
 ```
 
-Each combination is logged as a separate MLflow run. The best model across all runs is automatically selected by accuracy, registered in the MLflow Model Registry as `parkinson_detection_model`, and saved locally to `models/`.
+This ensures the validation fold in each CV split is always real, unaugmented data.
+
+### 5. Model Training — RandomizedSearchCV
+
+All 6 models are tuned with `RandomizedSearchCV` (not GridSearchCV) for efficient hyperparameter search. Each model uses a leakage-free `ImbPipeline` with SMOTE inside:
+
+| Model | Data | Search Iterations |
+|---|---|---|
+| Logistic Regression | scaled | 20 |
+| Random Forest | unscaled | 20 |
+| SVM | scaled | 15 |
+| KNN | scaled | 15 |
+| Decision Tree | unscaled | 20 |
+| XGBoost | unscaled | 30 |
+
+All runs are logged to MLflow. The best model by macro F1 is registered in the MLflow Model Registry as `parkinson_detection_model` and saved to `models/`.
 
 ---
 
 ## Model Results
 
-Results from the notebook experimentation (with SMOTE + GridSearchCV):
+Results from the notebook experimentation (with SMOTE + RandomizedSearchCV):
 
 | Model | Accuracy | Macro F1 | ROC AUC |
 |---|---|---|---|
@@ -182,7 +194,9 @@ Results from the notebook experimentation (with SMOTE + GridSearchCV):
 | Logistic Regression | 0.82 | 0.776 | 0.859 |
 | Decision Tree | 0.84 | 0.766 | 0.747 |
 
-### Best XGBoost Configuration (GridSearchCV)
+All metrics are macro-averaged. Selection criterion is macro F1 (not accuracy) to account for class imbalance.
+
+### Best XGBoost Configuration (RandomizedSearchCV)
 
 ```
 colsample_bytree : 0.8
@@ -209,7 +223,19 @@ weighted avg       0.89    0.89      0.89      152
 
 ## Explainability (SHAP)
 
-The system uses **SHAP TreeExplainer** for both global and local model interpretability.
+The system automatically selects the appropriate SHAP explainer based on the winning model type.
+
+### Explainer Selection
+
+```python
+TREE_MODELS = (RandomForestClassifier, GradientBoostingClassifier,
+               DecisionTreeClassifier, XGBClassifier)
+
+if isinstance(model, TREE_MODELS):
+    explainer = shap.TreeExplainer(model)      # fast, exact
+else:
+    explainer = shap.KernelExplainer(model.predict_proba, background)  # model-agnostic
+```
 
 ### Global Feature Importance (`src/explain.py`)
 
@@ -218,19 +244,16 @@ The system uses **SHAP TreeExplainer** for both global and local model interpret
 - Plots the top 20 most influential speech biomarkers
 - Saves to `static/feature_importance.png`
 
-```python
-explainer = shap.TreeExplainer(model)
-shap_values = explainer.shap_values(X_selected)
-importance = np.abs(shap_values).mean(axis=0)
-```
-
 ### Local Prediction Explanation (`api/main.py`)
 
-For every prediction, the API returns the top 10 feature contributions:
+For every prediction, the API returns the top 10 feature contributions with actual feature names:
 
-```python
-shap_values = explainer.shap_values(arr_selected)[0]
-top_indices = np.argsort(np.abs(shap_values))[-10:][::-1]
+```json
+{
+  "feature_index": 42,
+  "feature_name": "tqwt_kurtosisValue_dec_5",
+  "impact": 0.2341
+}
 ```
 
 - Positive SHAP value → pushes prediction toward Parkinson's
@@ -239,8 +262,10 @@ top_indices = np.argsort(np.abs(shap_values))[-10:][::-1]
 
 ### Learning Curve (`src/learning_curve.py`)
 
-- 5-fold cross-validation across increasing training set sizes
-- Plots train vs. validation accuracy to diagnose bias/variance
+- Full `ImbPipeline` (SMOTE → SelectFromModel → StandardScaler → model) refitted per fold
+- 5-fold stratified CV, macro F1 scoring
+- Plots train vs. validation score with ±1 std confidence bands
+- Annotates the train/val gap at the largest training size
 - Saves to `static/learning_curve.png`
 
 ---
@@ -249,27 +274,17 @@ top_indices = np.argsort(np.abs(shap_values))[-10:][::-1]
 
 ### MLflow + DagsHub
 
-All experiments are tracked remotely via DagsHub:
+All experiments are tracked remotely via DagsHub. Credentials are loaded from environment variables:
 
-```python
-dagshub.init(
-    repo_owner="nishnarudkar",
-    repo_name="Interpretable-Machine-Learning-System-for-Parkinson-s-Disease-Detection-from-Speech-Biomarkers",
-    mlflow=True
-)
-mlflow.set_experiment("parkinson_detection")
+```bash
+export DAGSHUB_USERNAME=your_username
+export DAGSHUB_TOKEN=your_token
 ```
 
 Each run logs:
 - **Params:** model name, hyperparameters, num_features
-- **Metrics:** accuracy, precision, recall, f1_score
+- **Metrics:** accuracy, macro_precision, macro_recall, macro_f1, roc_auc (all macro-averaged)
 - **Artifacts:** serialized model (sklearn flavor)
-
-The best model is registered in the MLflow Model Registry:
-
-```python
-mlflow.register_model(f"runs:/{best_run_id}/model", "parkinson_detection_model")
-```
 
 ### DVC Pipeline (`dvc.yaml`)
 
@@ -277,35 +292,25 @@ mlflow.register_model(f"runs:/{best_run_id}/model", "parkinson_detection_model")
 stages:
   train:
     cmd: python src/train.py
-    deps:
-      - src/train.py
-      - data/pd_speech_features.csv
-    outs:
-      - models/model.pkl
+    deps: [src/train.py, data/pd_speech_features.csv]
+    outs: [models/model.pkl, models/scaler.pkl, models/selector.pkl,
+           models/feature_names.pkl, models/column_order.pkl]
 
   explain:
     cmd: python src/explain.py
-    deps:
-      - src/explain.py
-      - models/model.pkl
-    outs:
-      - static/feature_importance.png
+    deps: [src/explain.py, models/model.pkl, models/scaler.pkl, models/selector.pkl]
+    outs: [static/feature_importance.png]
+
+  learning_curve:
+    cmd: python src/learning_curve.py
+    deps: [src/learning_curve.py, models/model.pkl, data/pd_speech_features.csv]
+    outs: [static/learning_curve.png]
 ```
 
 Run the full pipeline with:
 
 ```bash
 dvc repro
-```
-
-DVC tracks inputs/outputs and only re-runs stages whose dependencies have changed.
-
-### DVC Remote Storage
-
-Dataset is versioned and stored on DagsHub:
-
-```
-https://dagshub.com/nishnarudkar/Interpretable-Machine-Learning-System-for-Parkinson-s-Disease-Detection-from-Speech-Biomarkers.dvc
 ```
 
 ---
@@ -316,19 +321,14 @@ The FastAPI app serves a dark-themed, three-tab interactive UI.
 
 ### Tabs
 
-**Feature Importance**
-- Displays the global SHAP bar chart (`feature_importance.png`)
-- Shows the top 20 most influential speech biomarkers
+**Feature Importance** — Global SHAP bar chart of the top 20 speech biomarkers
 
-**Learning Curve**
-- Displays the bias-variance learning curve (`learning_curve.png`)
-- Helps visualize model generalization behavior
+**Learning Curve** — Bias-variance analysis with confidence bands
 
-**Prediction**
-- Accepts a comma-separated feature vector
-- Returns prediction label, confidence probability bar, and a SHAP explanation chart
-- Color-coded result: red for Parkinson's Detected, green for Healthy
-- Interactive horizontal bar chart showing top 10 feature contributions
+**Prediction** — Enter 753 comma-separated feature values to get:
+- Prediction label (Parkinson's / Healthy)
+- Confidence probability bar
+- Top 10 SHAP feature contributions with actual feature names
 
 ### UI Features
 
@@ -347,7 +347,13 @@ The FastAPI app serves a dark-themed, three-tab interactive UI.
 
 Returns the main HTML interface.
 
----
+### `GET /health`
+
+Returns API health status.
+
+```json
+{ "status": "ok", "model_loaded": true }
+```
 
 ### `POST /predict`
 
@@ -361,18 +367,18 @@ Runs inference on a feature vector and returns a SHAP explanation.
 }
 ```
 
-The vector must contain the same number of features as the original dataset (753 values, excluding `id` and `class`).
+Exactly 753 numeric values required (excluding `id` and `class`). Pydantic enforces this at the schema level — wrong length returns `422 Unprocessable Entity`.
 
 **Response:**
 
 ```json
 {
   "prediction": 1,
+  "label": "Parkinson's Detected",
   "probability": 0.923,
   "top_contributions": [
-    { "feature_index": 42, "impact": 0.2341 },
-    { "feature_index": 15, "impact": -0.1823 },
-    ...
+    { "feature_index": 42, "feature_name": "tqwt_kurtosisValue_dec_5", "impact": 0.2341 },
+    { "feature_index": 15, "feature_name": "PPE", "impact": -0.1823 }
   ]
 }
 ```
@@ -380,9 +386,10 @@ The vector must contain the same number of features as the original dataset (753
 | Field | Type | Description |
 |---|---|---|
 | `prediction` | int | `1` = Parkinson's, `0` = Healthy |
+| `label` | string | Human-readable prediction label |
 | `probability` | float | Probability of Parkinson's (class 1) |
 | `top_contributions` | list | Top 10 SHAP feature impacts |
-| `feature_index` | int | Index of the selected feature |
+| `feature_name` | string | Actual biomarker name |
 | `impact` | float | SHAP value (positive = toward Parkinson's) |
 
 ---
@@ -419,7 +426,14 @@ venv\Scripts\activate           # Windows
 pip install -r requirements.txt
 ```
 
-**4. Pull the dataset via DVC**
+**4. Set credentials**
+
+```bash
+cp .env.example .env
+# Edit .env and fill in DAGSHUB_USERNAME and DAGSHUB_TOKEN
+```
+
+**5. Pull the dataset via DVC**
 
 ```bash
 dvc pull
@@ -431,39 +445,14 @@ dvc pull
 
 ### Option A — Run each step manually
 
-**Train the model:**
-
 ```bash
-python src/train.py
-```
-
-This trains Logistic Regression, Random Forest, and XGBoost (12 hyperparameter combos), logs everything to MLflow/DagsHub, and saves the best model to `models/`.
-
-**Generate SHAP feature importance:**
-
-```bash
-python src/explain.py
-```
-
-Saves `static/feature_importance.png`.
-
-**Generate learning curve:**
-
-```bash
-python src/learning_curve.py
-```
-
-Saves `static/learning_curve.png`.
-
-**Start the web app:**
-
-```bash
+python src/train.py          # trains all 6 models, saves best to models/
+python src/explain.py        # generates static/feature_importance.png
+python src/learning_curve.py # generates static/learning_curve.png
 uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
 
 Open `http://localhost:8000` in your browser.
-
----
 
 ### Option B — Run via DVC pipeline
 
@@ -472,59 +461,47 @@ dvc repro
 uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
 
-DVC handles dependency tracking and only re-runs stages that are out of date.
-
----
-
 ### Option C — Open the notebook
 
-The Colab notebook `notebooks/Parkinsons_Detection_MLOPS_Project_SMOTE.ipynb` contains the full exploratory workflow including:
+`notebooks/Parkinsons_Detection_MLOPS_Project_SMOTE.ipynb` contains the full exploratory workflow:
 
 - EDA and class distribution analysis
-- SMOTE-based oversampling
+- SMOTE-based oversampling with leakage-free ImbPipeline
 - Feature selection with `SelectFromModel` (Random Forest)
-- Training and comparing 6 models: Logistic Regression, Random Forest, SVM, XGBoost, KNN, Decision Tree
-- GridSearchCV tuning of XGBoost with a leakage-free `ImbPipeline`
-- Confusion matrix and ROC curve visualization
+- Training and comparing 6 models: LR, RF, SVM, XGBoost, KNN, Decision Tree
+- RandomizedSearchCV tuning with StratifiedKFold
+- Confusion matrix, ROC curve, and learning curve visualization
 - SHAP analysis
 
 ---
 
 ## Docker Deployment
 
-**Build the image:**
+The Dockerfile uses a multi-stage build — only API dependencies are installed in the runtime image.
 
 ```bash
 docker build -t parkinson-ml .
-```
-
-**Run the container:**
-
-```bash
 docker run -p 8000:8000 parkinson-ml
 ```
 
 The app will be available at `http://localhost:8000`.
 
-The `Dockerfile` uses Python 3.10, copies the full project, installs dependencies, and starts Uvicorn on port 8000.
-
 ---
 
 ## CI/CD with Jenkins
 
-The `Jenkinsfile` defines a three-stage pipeline:
-
-```
-Install Dependencies → Train Model → Build Docker Image
-```
+The `Jenkinsfile` defines a five-stage pipeline:
 
 | Stage | Command |
 |---|---|
 | Install Dependencies | `pip install -r requirements.txt` |
+| Pull Data (DVC) | `dvc pull` |
 | Train Model | `python src/train.py` |
+| Generate Explanations | `python src/explain.py && python src/learning_curve.py` |
+| Smoke Test | `curl -f http://localhost:8000/health` |
 | Build Docker Image | `docker build -t parkinson-ml .` |
 
-Point a Jenkins job at this repository and configure it to use the `Jenkinsfile` for automated retraining and image builds on every push.
+Credentials (`DAGSHUB_USERNAME`, `DAGSHUB_TOKEN`) are injected via Jenkins credentials store — never hardcoded.
 
 ---
 
@@ -532,13 +509,13 @@ Point a Jenkins job at this repository and configure it to use the `Jenkinsfile`
 
 | Category | Tools |
 |---|---|
-| ML / Data | scikit-learn, XGBoost, pandas, numpy, imbalanced-learn |
-| Explainability | SHAP |
+| ML / Data | scikit-learn, XGBoost, pandas, numpy, imbalanced-learn, scipy |
+| Explainability | SHAP (TreeExplainer + KernelExplainer) |
 | Experiment Tracking | MLflow, DagsHub |
 | Data Versioning | DVC |
 | Web Framework | FastAPI, Uvicorn, Jinja2 |
 | Frontend | HTML5, CSS3, JavaScript, Chart.js |
-| Containerization | Docker |
+| Containerization | Docker (multi-stage) |
 | CI/CD | Jenkins |
 | Visualization | matplotlib, seaborn |
 | Notebook | Google Colab |
