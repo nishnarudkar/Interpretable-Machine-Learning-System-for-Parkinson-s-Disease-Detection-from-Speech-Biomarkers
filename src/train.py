@@ -131,29 +131,6 @@ best_f1     = 0
 best_model  = None
 best_run_id = None
 
-# --------------------------------
-# Helper: log a run to MLflow
-# --------------------------------
-def log_run(run_name, model_obj, params, X_tr, y_tr, X_te, y_te):
-    with mlflow.start_run(run_name=run_name) as run:
-        model_obj.fit(X_tr, y_tr)
-
-        y_pred = model_obj.predict(X_te)
-        y_prob = model_obj.predict_proba(X_te)[:, 1]
-
-        metrics = compute_metrics(y_te, y_pred, y_prob)
-
-        mlflow.log_params(params)
-        mlflow.log_metrics(metrics)
-        mlflow.sklearn.log_model(model_obj, name="model")
-
-        print(f"\n{run_name}:")
-        for k, v in metrics.items():
-            print(f"  {k}: {v:.4f}")
-        print(classification_report(y_te, y_pred))
-
-        return run.info.run_id, metrics["macro_f1"], model_obj
-
 
 # --------------------------------
 # Logistic Regression — RandomizedSearchCV inside ImbPipeline (scaled, no pre-SMOTE)
