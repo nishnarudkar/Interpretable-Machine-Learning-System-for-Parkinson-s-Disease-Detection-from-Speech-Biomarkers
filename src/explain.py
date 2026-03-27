@@ -24,8 +24,16 @@ X_sample = X.sample(50, random_state=42)
 
 print("Applying preprocessing (select → scale, matching train pipeline)...")
 
+# Step 1: select from 753 raw features → 100 selected features
 X_selected = selector.transform(X_sample)
-X_scaled   = scaler.transform(X_selected)
+assert X_selected.shape[1] == scaler.n_features_in_, (
+    f"Shape mismatch: selector output {X_selected.shape[1]} features, "
+    f"but scaler expects {scaler.n_features_in_}. "
+    "Ensure selector and scaler were saved from the same training run."
+)
+
+# Step 2: scale the 100 selected features
+X_scaled = scaler.transform(X_selected)
 
 # Recover feature names for the selected columns
 selected_features = X.columns[selector.get_support()]

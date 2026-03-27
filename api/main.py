@@ -72,8 +72,8 @@ def predict(data: FeatureInput):
     arr = np.array(data.features).reshape(1, -1)
 
     # Preprocessing: select → scale  (matches train.py order)
-    arr_selected = selector.transform(arr)
-    arr_scaled   = scaler.transform(arr_selected)
+    arr_selected = selector.transform(arr)          # 753 → 100 features
+    arr_scaled   = scaler.transform(arr_selected)   # scale the 100 selected features
 
     # Prediction
     prediction = int(model.predict(arr_scaled)[0])
