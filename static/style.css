@@ -342,6 +342,18 @@ body {
   border-top: 1px solid var(--border);
 }
 
+.shap-img-wrapper {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.shap-img-wrapper img {
+  border-radius: 8px;
+  max-width: 100%;
+  border: 1px solid var(--border);
+}
+
 /* ── Utility ── */
 .hidden { display: none !important; }
 

@@ -101,10 +101,13 @@
 
         <!-- SHAP Chart -->
         <div id="shap-section" class="shap-section hidden">
-          <h3>Top Feature Contributions (SHAP)</h3>
+          <h3>Top Biomarkers (SHAP Explanation)</h3>
           <p class="shap-desc">Positive values push toward Parkinson's; negative values push toward Healthy.</p>
           <div class="chart-wrapper">
             <canvas id="shapChart"></canvas>
+          </div>
+          <div id="shap-img-wrapper" class="shap-img-wrapper hidden">
+            <img id="shap-bar-img" src="" alt="SHAP bar chart" width="600" />
           </div>
         </div>
 

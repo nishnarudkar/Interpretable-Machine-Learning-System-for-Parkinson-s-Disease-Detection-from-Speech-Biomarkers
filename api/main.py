@@ -10,6 +10,9 @@ import pandas as pd
 import shap
 import sys
 import logging
+import matplotlib
+matplotlib.use("Agg")   # non-interactive backend — safe for server use
+import matplotlib.pyplot as plt
 from pathlib import Path
 
 logger = logging.getLogger("uvicorn.error")
@@ -182,11 +185,38 @@ def predict(data: FeatureInput):
             for i in top_indices
         ]
 
+        # ── Generate SHAP bar chart PNG ───────────────────────────────────────
+        names   = [feature_names[i] for i in top_indices]
+        impacts = [float(shap_vals[i]) for i in top_indices]
+        colors  = ["#f87171" if v >= 0 else "#34d399" for v in impacts]
+
+        fig, ax = plt.subplots(figsize=(8, 5))
+        bars = ax.barh(names[::-1], impacts[::-1], color=colors[::-1])
+        ax.axvline(0, color="#8892b0", linewidth=0.8, linestyle="--")
+        ax.set_xlabel("SHAP Value (impact on prediction)", color="#e2e8f0")
+        ax.set_title(
+            f"Top Biomarkers — {'Parkinson' if prediction == 1 else 'Healthy'} "
+            f"({prob*100:.1f}% confidence)",
+            color="#e2e8f0", fontsize=11,
+        )
+        fig.patch.set_facecolor("#1a1d27")
+        ax.set_facecolor("#22263a")
+        ax.tick_params(colors="#e2e8f0")
+        ax.spines[:].set_color("#2e3250")
+        plt.tight_layout()
+
+        shap_bar_path = STATIC_DIR / "shap_bar.png"
+        plt.savefig(shap_bar_path, dpi=120, bbox_inches="tight",
+                    facecolor=fig.get_facecolor())
+        plt.close(fig)
+        # ─────────────────────────────────────────────────────────────────────
+
         return {
             "prediction":        prediction,
             "label":             "Parkinson's Detected" if prediction == 1 else "Healthy",
             "probability":       prob,
             "top_contributions": explanation,
+            "shap_bar_url":      "/static/shap_bar.png",
         }
 
     except Exception as e:

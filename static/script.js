@@ -31,6 +31,7 @@ async function predict() {
     const data = await response.json();
     renderResult(data);
     renderShapChart(data.top_contributions);
+    if (data.shap_bar_url) renderShapImage(data.shap_bar_url);
   } catch (err) {
     showError("Prediction failed. Check the server and try again.");
     console.error(err);
@@ -73,6 +74,15 @@ function showError(msg) {
   document.getElementById("result-label").textContent = msg;
   document.getElementById("prob-bar").style.width = "0%";
   document.getElementById("prob-text").textContent = "";
+}
+
+// ── SHAP server-generated PNG ──
+function renderShapImage(url) {
+  const wrapper = document.getElementById("shap-img-wrapper");
+  const img     = document.getElementById("shap-bar-img");
+  // Append cache-buster so the browser reloads the image on each prediction
+  img.src = url + "?t=" + Date.now();
+  wrapper.classList.remove("hidden");
 }
 
 // ── SHAP Chart ──
