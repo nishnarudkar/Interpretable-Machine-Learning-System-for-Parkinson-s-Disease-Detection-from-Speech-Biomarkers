@@ -99,6 +99,7 @@ X_test_sel_scaled  = scaler.transform(X_test_sel)
 
 # --------------------------------
 # SMOTE on selected features for training
+# (kept for XGBoost pipeline compatibility)
 # --------------------------------
 smote = SMOTE(random_state=42)
 X_train_sel_smote,    y_train_smote = smote.fit_resample(X_train_sel,        y_train)
@@ -117,6 +118,10 @@ def compute_metrics(y_true, y_pred, y_prob):
         "roc_auc":   roc_auc_score(y_true, y_prob),
     }
 
+
+best_f1     = 0
+best_model  = None
+best_run_id = None
 
 # --------------------------------
 # Helper: log a run to MLflow
@@ -142,13 +147,8 @@ def log_run(run_name, model_obj, params, X_tr, y_tr, X_te, y_te):
         return run.info.run_id, metrics["macro_f1"], model_obj
 
 
-best_f1     = 0
-best_model  = None
-best_run_id = None
-
-
 # --------------------------------
-# Logistic Regression — RandomizedSearchCV (scaled + SMOTE)
+# Logistic Regression — RandomizedSearchCV inside ImbPipeline (scaled, no pre-SMOTE)
 # --------------------------------
 print("\n--- Tuning Logistic Regression ---")
 lr_pipeline = ImbPipeline([
@@ -156,146 +156,207 @@ lr_pipeline = ImbPipeline([
     ("lr",    LogisticRegression(random_state=42, max_iter=2000)),
 ])
 lr_param_dist = {
-    "lr__C":      uniform(0.01, 10),
-    "lr__solver": ["lbfgs", "saga"],
-    "lr__penalty":["l2"],
+    "lr__C":       uniform(0.01, 10),
+    "lr__solver":  ["lbfgs", "saga"],
+    "lr__penalty": ["l2"],
 }
 lr_search = RandomizedSearchCV(
     lr_pipeline, lr_param_dist, n_iter=20,
     scoring="f1_macro", cv=StratifiedKFold(5, shuffle=True, random_state=42),
     n_jobs=-1, random_state=42, verbose=0
 )
-lr_search.fit(X_train_sel_scaled, y_train)
-best_lr = lr_search.best_estimator_.named_steps["lr"]
+lr_search.fit(X_train_sel_scaled, y_train)   # raw (unsmoted) train — SMOTE inside pipeline
+best_lr_pipeline = lr_search.best_estimator_
 
-run_id, f1, mdl = log_run(
-    run_name="LogisticRegression",
-    model_obj=best_lr,
-    params={**{k.replace("lr__", ""): v for k, v in lr_search.best_params_.items()},
-            "model": "LogisticRegression", "num_features": 100},
-    X_tr=X_train_scaled_smote, y_tr=y_train_smote,
-    X_te=X_test_sel_scaled,    y_te=y_test,
-)
-if f1 > best_f1:
-    best_f1, best_model, best_run_id = f1, mdl, run_id
+y_pred_lr = best_lr_pipeline.predict(X_test_sel_scaled)
+y_prob_lr = best_lr_pipeline.predict_proba(X_test_sel_scaled)[:, 1]
+lr_metrics = compute_metrics(y_test, y_pred_lr, y_prob_lr)
+
+with mlflow.start_run(run_name="LogisticRegression") as run:
+    params = {k.replace("lr__", ""): v for k, v in lr_search.best_params_.items()}
+    params.update({"model": "LogisticRegression", "num_features": 100})
+    mlflow.log_params(params)
+    mlflow.log_metrics(lr_metrics)
+    mlflow.sklearn.log_model(best_lr_pipeline.named_steps["lr"], artifact_path="model")
+    lr_run_id = run.info.run_id
+
+print(f"\nLogisticRegression: {lr_metrics}")
+print(classification_report(y_test, y_pred_lr))
+
+if lr_metrics["macro_f1"] > best_f1:
+    best_f1     = lr_metrics["macro_f1"]
+    best_model  = best_lr_pipeline.named_steps["lr"]
+    best_run_id = lr_run_id
 
 
 # --------------------------------
-# Random Forest — RandomizedSearchCV (unscaled + SMOTE)
+# Random Forest — RandomizedSearchCV inside ImbPipeline (unscaled)
 # --------------------------------
 print("\n--- Tuning Random Forest ---")
+rf_pipeline = ImbPipeline([
+    ("smote", SMOTE(random_state=42)),
+    ("rf",    RandomForestClassifier(random_state=42)),
+])
 rf_param_dist = {
-    "n_estimators": randint(100, 400),
-    "max_depth":    [None, 10, 20, 30],
-    "max_features": ["sqrt", "log2"],
-    "min_samples_split": randint(2, 10),
+    "rf__n_estimators":      randint(100, 400),
+    "rf__max_depth":         [None, 10, 20, 30],
+    "rf__max_features":      ["sqrt", "log2"],
+    "rf__min_samples_split": randint(2, 10),
 }
 rf_search = RandomizedSearchCV(
-    RandomForestClassifier(random_state=42),
-    rf_param_dist, n_iter=20,
+    rf_pipeline, rf_param_dist, n_iter=20,
     scoring="f1_macro", cv=StratifiedKFold(5, shuffle=True, random_state=42),
     n_jobs=-1, random_state=42, verbose=0
 )
-rf_search.fit(X_train_sel_smote, y_train_smote)
-best_rf = rf_search.best_estimator_
+rf_search.fit(X_train_sel, y_train)
+best_rf_pipeline = rf_search.best_estimator_
 
-run_id, f1, mdl = log_run(
-    run_name="RandomForest",
-    model_obj=best_rf,
-    params={**rf_search.best_params_, "model": "RandomForest", "num_features": 100},
-    X_tr=X_train_sel_smote, y_tr=y_train_smote,
-    X_te=X_test_sel,        y_te=y_test,
-)
-if f1 > best_f1:
-    best_f1, best_model, best_run_id = f1, mdl, run_id
+y_pred_rf = best_rf_pipeline.predict(X_test_sel)
+y_prob_rf = best_rf_pipeline.predict_proba(X_test_sel)[:, 1]
+rf_metrics = compute_metrics(y_test, y_pred_rf, y_prob_rf)
+
+with mlflow.start_run(run_name="RandomForest") as run:
+    params = {k.replace("rf__", ""): v for k, v in rf_search.best_params_.items()}
+    params.update({"model": "RandomForest", "num_features": 100})
+    mlflow.log_params(params)
+    mlflow.log_metrics(rf_metrics)
+    mlflow.sklearn.log_model(best_rf_pipeline.named_steps["rf"], artifact_path="model")
+    rf_run_id = run.info.run_id
+
+print(f"\nRandomForest: {rf_metrics}")
+print(classification_report(y_test, y_pred_rf))
+
+if rf_metrics["macro_f1"] > best_f1:
+    best_f1     = rf_metrics["macro_f1"]
+    best_model  = best_rf_pipeline.named_steps["rf"]
+    best_run_id = rf_run_id
 
 
 # --------------------------------
-# SVM — RandomizedSearchCV (scaled + SMOTE)
+# SVM — RandomizedSearchCV inside ImbPipeline (scaled)
 # --------------------------------
 print("\n--- Tuning SVM ---")
+svm_pipeline = ImbPipeline([
+    ("smote", SMOTE(random_state=42)),
+    ("svm",   SVC(probability=True, random_state=42)),
+])
 svm_param_dist = {
-    "C":     uniform(0.1, 10),
-    "gamma": ["scale", "auto"],
-    "kernel":["rbf", "poly"],
+    "svm__C":      uniform(0.1, 10),
+    "svm__gamma":  ["scale", "auto"],
+    "svm__kernel": ["rbf", "poly"],
 }
 svm_search = RandomizedSearchCV(
-    SVC(probability=True, random_state=42),
-    svm_param_dist, n_iter=15,
+    svm_pipeline, svm_param_dist, n_iter=15,
     scoring="f1_macro", cv=StratifiedKFold(5, shuffle=True, random_state=42),
     n_jobs=-1, random_state=42, verbose=0
 )
-svm_search.fit(X_train_scaled_smote, y_train_smote)
-best_svm = svm_search.best_estimator_
+svm_search.fit(X_train_sel_scaled, y_train)
+best_svm_pipeline = svm_search.best_estimator_
 
-run_id, f1, mdl = log_run(
-    run_name="SVM",
-    model_obj=best_svm,
-    params={**svm_search.best_params_, "model": "SVM", "num_features": 100},
-    X_tr=X_train_scaled_smote, y_tr=y_train_smote,
-    X_te=X_test_sel_scaled,    y_te=y_test,
-)
-if f1 > best_f1:
-    best_f1, best_model, best_run_id = f1, mdl, run_id
+y_pred_svm = best_svm_pipeline.predict(X_test_sel_scaled)
+y_prob_svm = best_svm_pipeline.predict_proba(X_test_sel_scaled)[:, 1]
+svm_metrics = compute_metrics(y_test, y_pred_svm, y_prob_svm)
+
+with mlflow.start_run(run_name="SVM") as run:
+    params = {k.replace("svm__", ""): v for k, v in svm_search.best_params_.items()}
+    params.update({"model": "SVM", "num_features": 100})
+    mlflow.log_params(params)
+    mlflow.log_metrics(svm_metrics)
+    mlflow.sklearn.log_model(best_svm_pipeline.named_steps["svm"], artifact_path="model")
+    svm_run_id = run.info.run_id
+
+print(f"\nSVM: {svm_metrics}")
+print(classification_report(y_test, y_pred_svm))
+
+if svm_metrics["macro_f1"] > best_f1:
+    best_f1     = svm_metrics["macro_f1"]
+    best_model  = best_svm_pipeline.named_steps["svm"]
+    best_run_id = svm_run_id
 
 
 # --------------------------------
-# KNN — RandomizedSearchCV (scaled + SMOTE)
+# KNN — RandomizedSearchCV inside ImbPipeline (scaled)
 # --------------------------------
 print("\n--- Tuning KNN ---")
+knn_pipeline = ImbPipeline([
+    ("smote", SMOTE(random_state=42)),
+    ("knn",   KNeighborsClassifier()),
+])
 knn_param_dist = {
-    "n_neighbors": randint(3, 20),
-    "weights":     ["uniform", "distance"],
-    "metric":      ["euclidean", "manhattan"],
+    "knn__n_neighbors": randint(3, 20),
+    "knn__weights":     ["uniform", "distance"],
+    "knn__metric":      ["euclidean", "manhattan"],
 }
 knn_search = RandomizedSearchCV(
-    KNeighborsClassifier(),
-    knn_param_dist, n_iter=15,
+    knn_pipeline, knn_param_dist, n_iter=15,
     scoring="f1_macro", cv=StratifiedKFold(5, shuffle=True, random_state=42),
     n_jobs=-1, random_state=42, verbose=0
 )
-knn_search.fit(X_train_scaled_smote, y_train_smote)
-best_knn = knn_search.best_estimator_
+knn_search.fit(X_train_sel_scaled, y_train)
+best_knn_pipeline = knn_search.best_estimator_
 
-run_id, f1, mdl = log_run(
-    run_name="KNN",
-    model_obj=best_knn,
-    params={**knn_search.best_params_, "model": "KNN", "num_features": 100},
-    X_tr=X_train_scaled_smote, y_tr=y_train_smote,
-    X_te=X_test_sel_scaled,    y_te=y_test,
-)
-if f1 > best_f1:
-    best_f1, best_model, best_run_id = f1, mdl, run_id
+y_pred_knn = best_knn_pipeline.predict(X_test_sel_scaled)
+y_prob_knn = best_knn_pipeline.predict_proba(X_test_sel_scaled)[:, 1]
+knn_metrics = compute_metrics(y_test, y_pred_knn, y_prob_knn)
+
+with mlflow.start_run(run_name="KNN") as run:
+    params = {k.replace("knn__", ""): v for k, v in knn_search.best_params_.items()}
+    params.update({"model": "KNN", "num_features": 100})
+    mlflow.log_params(params)
+    mlflow.log_metrics(knn_metrics)
+    mlflow.sklearn.log_model(best_knn_pipeline.named_steps["knn"], artifact_path="model")
+    knn_run_id = run.info.run_id
+
+print(f"\nKNN: {knn_metrics}")
+print(classification_report(y_test, y_pred_knn))
+
+if knn_metrics["macro_f1"] > best_f1:
+    best_f1     = knn_metrics["macro_f1"]
+    best_model  = best_knn_pipeline.named_steps["knn"]
+    best_run_id = knn_run_id
 
 
 # --------------------------------
-# Decision Tree — RandomizedSearchCV (unscaled + SMOTE)
+# Decision Tree — RandomizedSearchCV inside ImbPipeline (unscaled)
 # --------------------------------
 print("\n--- Tuning Decision Tree ---")
+dt_pipeline = ImbPipeline([
+    ("smote", SMOTE(random_state=42)),
+    ("dt",    DecisionTreeClassifier(random_state=42)),
+])
 dt_param_dist = {
-    "max_depth":        [None, 5, 10, 15, 20],
-    "min_samples_split": randint(2, 20),
-    "min_samples_leaf":  randint(1, 10),
-    "criterion":        ["gini", "entropy"],
+    "dt__max_depth":         [None, 5, 10, 15, 20],
+    "dt__min_samples_split": randint(2, 20),
+    "dt__min_samples_leaf":  randint(1, 10),
+    "dt__criterion":         ["gini", "entropy"],
 }
 dt_search = RandomizedSearchCV(
-    DecisionTreeClassifier(random_state=42),
-    dt_param_dist, n_iter=20,
+    dt_pipeline, dt_param_dist, n_iter=20,
     scoring="f1_macro", cv=StratifiedKFold(5, shuffle=True, random_state=42),
     n_jobs=-1, random_state=42, verbose=0
 )
-dt_search.fit(X_train_sel_smote, y_train_smote)
-best_dt = dt_search.best_estimator_
+dt_search.fit(X_train_sel, y_train)
+best_dt_pipeline = dt_search.best_estimator_
 
-run_id, f1, mdl = log_run(
-    run_name="DecisionTree",
-    model_obj=best_dt,
-    params={**dt_search.best_params_, "model": "DecisionTree", "num_features": 100},
-    X_tr=X_train_sel_smote, y_tr=y_train_smote,
-    X_te=X_test_sel,        y_te=y_test,
-)
-if f1 > best_f1:
-    best_f1, best_model, best_run_id = f1, mdl, run_id
+y_pred_dt = best_dt_pipeline.predict(X_test_sel)
+y_prob_dt = best_dt_pipeline.predict_proba(X_test_sel)[:, 1]
+dt_metrics = compute_metrics(y_test, y_pred_dt, y_prob_dt)
+
+with mlflow.start_run(run_name="DecisionTree") as run:
+    params = {k.replace("dt__", ""): v for k, v in dt_search.best_params_.items()}
+    params.update({"model": "DecisionTree", "num_features": 100})
+    mlflow.log_params(params)
+    mlflow.log_metrics(dt_metrics)
+    mlflow.sklearn.log_model(best_dt_pipeline.named_steps["dt"], artifact_path="model")
+    dt_run_id = run.info.run_id
+
+print(f"\nDecisionTree: {dt_metrics}")
+print(classification_report(y_test, y_pred_dt))
+
+if dt_metrics["macro_f1"] > best_f1:
+    best_f1     = dt_metrics["macro_f1"]
+    best_model  = best_dt_pipeline.named_steps["dt"]
+    best_run_id = dt_run_id
 
 
 # --------------------------------

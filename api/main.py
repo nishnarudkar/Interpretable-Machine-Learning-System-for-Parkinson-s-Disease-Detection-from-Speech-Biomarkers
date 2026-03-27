@@ -8,11 +8,17 @@ import joblib
 import numpy as np
 import shap
 import os
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.tree import DecisionTreeClassifier
+from xgboost import XGBClassifier
 
 app = FastAPI(title="Parkinson Detection API", version="1.0.0")
 
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+TREE_MODELS = (RandomForestClassifier, GradientBoostingClassifier,
+               DecisionTreeClassifier, XGBClassifier)
 
 # ── Load artifacts at startup ─────────────────────────────────────────────────
 try:
@@ -20,9 +26,22 @@ try:
     scaler         = joblib.load("models/scaler.pkl")
     selector       = joblib.load("models/selector.pkl")
     feature_names  = joblib.load("models/feature_names.pkl")
-    explainer      = shap.TreeExplainer(model)
-    EXPECTED_FEATURES = 753   # number of raw input features (excluding id/class)
-    print("All model artifacts loaded successfully.")
+    EXPECTED_FEATURES = 753
+
+    if isinstance(model, TREE_MODELS):
+        explainer = shap.TreeExplainer(model)
+    else:
+        # KernelExplainer: needs a small background dataset
+        # Load a sample of the training data for the background
+        import pandas as pd
+        df = pd.read_csv("data/pd_speech_features.csv", header=1)
+        X_bg = df.drop(["id", "class"], axis=1).sample(50, random_state=42)
+        X_bg_sel    = selector.transform(X_bg)
+        X_bg_scaled = scaler.transform(X_bg_sel)
+        background  = shap.kmeans(X_bg_scaled, 10)
+        explainer   = shap.KernelExplainer(model.predict_proba, background)
+
+    print(f"Loaded model: {type(model).__name__}, explainer: {type(explainer).__name__}")
 except FileNotFoundError as e:
     raise RuntimeError(
         f"Model artifact not found: {e}. Run `python src/train.py` first."
@@ -63,11 +82,11 @@ def predict(data: FeatureInput):
     # SHAP explanation
     shap_vals = explainer.shap_values(arr_scaled)
 
-    # Normalise SHAP output across model types
+    # Normalise SHAP output across all explainer/model types
     if isinstance(shap_vals, list):
-        shap_vals = shap_vals[1]          # RandomForest list → class-1
+        shap_vals = shap_vals[1]          # list → class-1 (RF, KernelExplainer)
     elif isinstance(shap_vals, np.ndarray) and shap_vals.ndim == 3:
-        shap_vals = shap_vals[:, :, 1]    # 3D → class-1 slice
+        shap_vals = shap_vals[:, :, 1]    # 3D → class-1 slice (some XGBoost configs)
 
     shap_vals = shap_vals[0]              # shape: (n_selected_features,)
 

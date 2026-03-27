@@ -4,6 +4,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.tree import DecisionTreeClassifier
+from xgboost import XGBClassifier
 
 print("Loading model and preprocessing artifacts...")
 
@@ -21,36 +24,41 @@ X_sample = X.sample(50, random_state=42)
 
 print("Applying preprocessing (select → scale, matching train pipeline)...")
 
-# Step 1: feature selection on raw data (matches train.py order)
 X_selected = selector.transform(X_sample)
-
-# Step 2: scale the selected features
-X_scaled = scaler.transform(X_selected)
+X_scaled   = scaler.transform(X_selected)
 
 # Recover feature names for the selected columns
 selected_features = X.columns[selector.get_support()]
 
-print("Creating SHAP TreeExplainer...")
-explainer  = shap.TreeExplainer(model)
+# ── Choose the right SHAP explainer based on model type ──────────────────────
+TREE_MODELS = (RandomForestClassifier, GradientBoostingClassifier,
+               DecisionTreeClassifier, XGBClassifier)
+
+if isinstance(model, TREE_MODELS):
+    print("Creating SHAP TreeExplainer...")
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(X_scaled)
+else:
+    print(f"Model is {type(model).__name__} — using KernelExplainer (slower)...")
+    # KernelExplainer needs a background dataset; use the mean of training data
+    background = shap.kmeans(X_scaled, 10)
+    explainer  = shap.KernelExplainer(model.predict_proba, background)
+    shap_values = explainer.shap_values(X_scaled, nsamples=100)
+# ─────────────────────────────────────────────────────────────────────────────
 
 print("Calculating SHAP values...")
-shap_values = explainer.shap_values(X_scaled)
 
 # Normalise to a single 2D array (n_samples, n_features)
-# - RandomForest / list output  → take class-1 slice
-# - XGBoost 3D (n,f,c)          → take class-1 slice along last axis
-# - Already 2D                  → use as-is
 if isinstance(shap_values, list):
-    shap_values = shap_values[1]
+    shap_values = shap_values[1]          # list → class-1 slice
 elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
-    shap_values = shap_values[:, :, 1]
+    shap_values = shap_values[:, :, 1]    # 3D → class-1 slice
 
-# Now guaranteed 2D → mean absolute SHAP per feature
-importance = np.abs(shap_values).mean(axis=0)  # shape: (n_features,)
+importance = np.abs(shap_values).mean(axis=0)
 
 feature_importance = pd.DataFrame({
     "feature":    selected_features,
-    "importance": importance
+    "importance": importance,
 }).sort_values("importance", ascending=False)
 
 top_features = feature_importance.head(20)
@@ -61,7 +69,7 @@ plt.figure(figsize=(10, 6))
 plt.barh(top_features["feature"], top_features["importance"])
 plt.gca().invert_yaxis()
 plt.xlabel("Mean |SHAP value|")
-plt.title("Top 20 Speech Biomarkers for Parkinson Detection")
+plt.title(f"Top 20 Speech Biomarkers for Parkinson Detection\n({type(model).__name__})")
 plt.tight_layout()
 
 os.makedirs("static", exist_ok=True)
