@@ -36,12 +36,17 @@ explainer  = shap.TreeExplainer(model)
 print("Calculating SHAP values...")
 shap_values = explainer.shap_values(X_scaled)
 
-# For binary classifiers that return a list (e.g. RandomForest), take class-1 values
+# Normalise to a single 2D array (n_samples, n_features)
+# - RandomForest / list output  → take class-1 slice
+# - XGBoost 3D (n,f,c)          → take class-1 slice along last axis
+# - Already 2D                  → use as-is
 if isinstance(shap_values, list):
     shap_values = shap_values[1]
+elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
+    shap_values = shap_values[:, :, 1]
 
-# Mean absolute SHAP across samples
-importance = np.abs(shap_values).mean(axis=0)
+# Now guaranteed 2D → mean absolute SHAP per feature
+importance = np.abs(shap_values).mean(axis=0)  # shape: (n_features,)
 
 feature_importance = pd.DataFrame({
     "feature":    selected_features,
