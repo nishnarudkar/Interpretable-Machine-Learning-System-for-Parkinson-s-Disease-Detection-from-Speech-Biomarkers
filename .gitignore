@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Model artifacts (tracked via DVC or locally only)
+models/
+
+# MLflow local backend
+mlflow.db
+mlruns/
+
+# Data (tracked via DVC)
+data/pd_speech_features.csv
+
+# Generated static assets
+static/feature_importance.png
+static/learning_curve.png
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp

@@ -1,10 +1,21 @@
+import os
+
+# ── Must be set BEFORE any mlflow import or call ──────────────────────────────
+DAGSHUB_TRACKING_URI = (
+    "https://dagshub.com/nishnarudkar/"
+    "Interpretable-Machine-Learning-System-for-Parkinson-s-Disease-Detection-from-Speech-Biomarkers.mlflow"
+)
+os.environ["MLFLOW_TRACKING_URI"]      = DAGSHUB_TRACKING_URI
+os.environ["MLFLOW_TRACKING_USERNAME"] = "nishnarudkar"
+os.environ["MLFLOW_TRACKING_PASSWORD"] = "fad6df01b35858789327a0e48a1d0c5e0f07a4b9"
+# ──────────────────────────────────────────────────────────────────────────────
+
 import pandas as pd
 import numpy as np
 import mlflow
 import mlflow.sklearn
 import joblib
 import dagshub
-import os
 
 from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV
 from sklearn.preprocessing import StandardScaler
@@ -32,6 +43,7 @@ dagshub.init(
     mlflow=True
 )
 
+mlflow.set_tracking_uri(DAGSHUB_TRACKING_URI)
 mlflow.set_experiment("parkinson_detection")
 
 
