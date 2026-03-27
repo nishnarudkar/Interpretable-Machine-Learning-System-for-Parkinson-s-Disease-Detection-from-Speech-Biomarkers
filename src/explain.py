@@ -4,9 +4,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import shap
 import joblib
+import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import logging
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier
@@ -17,6 +19,35 @@ from src.config import (
     FEATURE_IMPORTANCE_PNG, STATIC_DIR,
 )
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+TREE_MODELS = (RandomForestClassifier, GradientBoostingClassifier,
+               DecisionTreeClassifier, XGBClassifier)
+
+
+def extract_shap_for_class1(raw: object) -> np.ndarray:
+    """
+    Robustly extract a 2-D SHAP array (n_samples, n_features) for class 1,
+    regardless of SHAP version or model type output format.
+    """
+    if isinstance(raw, list):
+        arr = np.array(raw[1])
+    else:
+        arr = np.array(raw)
+
+    if arr.ndim == 3:
+        arr = arr[:, :, 1]   # (n_samples, n_features, n_classes) → class-1
+
+    if arr.ndim == 1:
+        arr = arr[np.newaxis, :]  # single sample → (1, n_features)
+
+    if arr.ndim != 2:
+        raise ValueError(f"Unexpected SHAP shape after normalisation: {arr.shape}")
+
+    return arr   # (n_samples, n_features)
+
+
 print("Loading model and preprocessing artifacts...")
 model    = joblib.load(MODEL_PATH)
 scaler   = joblib.load(SCALER_PATH)
@@ -25,51 +56,41 @@ selector = joblib.load(SELECTOR_PATH)
 print("Loading dataset...")
 X, _ = load_dataset()
 
-# Sample for speed
 X_sample = X.sample(50, random_state=42)
 
-print("Applying preprocessing (select → scale, matching train pipeline)...")
-
-# Step 1: select from raw features → 100 selected features
+print("Applying preprocessing (select → scale)...")
 X_selected = selector.transform(X_sample)
 assert X_selected.shape[1] == scaler.n_features_in_, (
     f"Shape mismatch: selector output {X_selected.shape[1]} features, "
     f"but scaler expects {scaler.n_features_in_}. "
     "Ensure selector and scaler were saved from the same training run."
 )
-
-# Step 2: scale the selected features
 X_scaled = scaler.transform(X_selected)
 
-# Recover feature names for the selected columns
 selected_features = X.columns[selector.get_support()]
 
-# ── Choose the right SHAP explainer based on model type ──────────────────────
-TREE_MODELS = (RandomForestClassifier, GradientBoostingClassifier,
-               DecisionTreeClassifier, XGBClassifier)
-
+# ── Choose explainer ──────────────────────────────────────────────────────────
 if isinstance(model, TREE_MODELS):
     print("Creating SHAP TreeExplainer...")
     explainer   = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(X_scaled)
 else:
     print(f"Model is {type(model).__name__} — using KernelExplainer (slower)...")
-    background  = shap.kmeans(X_scaled, 10)
+    n_bg       = min(50, len(X_scaled))
+    n_clusters = min(10, n_bg)
+    try:
+        background = shap.kmeans(X_scaled, n_clusters)
+    except Exception as e:
+        logger.warning(f"kmeans background failed ({e}), using zero vector")
+        background = np.zeros((1, X_scaled.shape[1]))
     explainer   = shap.KernelExplainer(model.predict_proba, background)
     shap_values = explainer.shap_values(X_scaled, nsamples=100)
 # ─────────────────────────────────────────────────────────────────────────────
 
 print("Calculating SHAP values...")
+shap_2d    = extract_shap_for_class1(shap_values)   # (n_samples, n_features)
+importance = np.abs(shap_2d).mean(axis=0)           # (n_features,)
 
-# Normalise to a single 2D array (n_samples, n_features)
-if isinstance(shap_values, list):
-    shap_values = shap_values[1]
-elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
-    shap_values = shap_values[:, :, 1]
-
-importance = np.abs(shap_values).mean(axis=0)
-
-import pandas as pd
 feature_importance = pd.DataFrame({
     "feature":    selected_features,
     "importance": importance,
