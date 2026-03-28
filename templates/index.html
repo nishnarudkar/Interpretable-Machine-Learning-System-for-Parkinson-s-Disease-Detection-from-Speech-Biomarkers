@@ -86,27 +86,11 @@
       <div class="card">
         <div class="card-header">
           <h2>Parkinson's Disease Prediction</h2>
-          <p>Edit the top five speech biomarkers (by model importance). Other features use training-set means automatically.</p>
+          <p>Adjust key speech biomarkers below. Remaining features are automatically handled by the model.</p>
         </div>
 
         <div class="input-section prediction-input-section">
-          <p class="prediction-helper-text">
-            Only top 5 biomarkers are required. Remaining features are automatically handled by the model.
-            <span class="prediction-tooltip-wrap">
-              <button
-                type="button"
-                class="prediction-help-btn"
-                aria-describedby="prediction-shap-tooltip"
-              >
-                <span class="visually-hidden">Why these five features?</span>
-                <span class="prediction-help-icon" aria-hidden="true">i</span>
-              </button>
-              <span id="prediction-shap-tooltip" class="prediction-tooltip-bubble" role="tooltip">
-                These features were selected based on SHAP importance.
-              </span>
-            </span>
-          </p>
-          <div id="prediction-fields" class="prediction-fields" aria-live="polite">
+          <div id="prediction-fields" class="prediction-fields feature-grid" aria-live="polite">
             <p class="prediction-fields-loading">Loading feature inputs…</p>
           </div>
           <button class="predict-btn" onclick="predict()">

@@ -268,6 +268,43 @@ def predict(body: Dict[str, Any] = Body(...)):
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 
+@app.get("/feature-defaults")
+def feature_defaults():
+    """Return the top 5 editable features with medians + all 753 median defaults."""
+    import json
+    defaults_path = STATIC_DIR / "feature_medians.json"
+    if not defaults_path.exists():
+        raise HTTPException(status_code=404, detail="Run feature_medians generation first.")
+    with open(defaults_path) as f:
+        data = json.load(f)
+
+    # User-friendly labels for the top 5
+    friendly = {
+        "maxIntensity":       {"label": "Max Intensity",          "tooltip": "Maximum vocal intensity (loudness) of the speech signal"},
+        "f2":                 {"label": "Formant F2 (Hz)",         "tooltip": "Second formant frequency — related to tongue position during speech"},
+        "mean_MFCC_2nd_coef": {"label": "MFCC Coefficient 2",     "tooltip": "2nd Mel-frequency cepstral coefficient — captures spectral shape of voice"},
+        "mean_MFCC_3rd_coef": {"label": "MFCC Coefficient 3",     "tooltip": "3rd MFCC — reflects fine spectral detail of vocal tract"},
+        "mean_MFCC_6th_coef": {"label": "MFCC Coefficient 6",     "tooltip": "6th MFCC — captures higher-order spectral variation in speech"},
+    }
+
+    top5 = [
+        {
+            "name":    name,
+            "label":   friendly.get(name, {}).get("label", name),
+            "tooltip": friendly.get(name, {}).get("tooltip", ""),
+            "median":  data["medians"][name],
+        }
+        for name in feature_names[:5]
+        if name in data["medians"]
+    ]
+
+    return {
+        "top5":    top5,
+        "columns": data["columns"],
+        "medians": data["medians"],
+    }
+
+
 @app.get("/model-comparison")
 def model_comparison():
     """

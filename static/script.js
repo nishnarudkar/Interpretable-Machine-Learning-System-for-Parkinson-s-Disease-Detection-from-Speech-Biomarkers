@@ -33,102 +33,92 @@ async function loadTopFeatures() {
   }
 }
 
-// ── Prediction inputs (top 5 features) ──
+// ── Prediction inputs (top 5 features as grid cards) ──
+let _allColumns  = [];
+let _allMedians  = {};
+
 async function loadPredictionFields() {
   const container = document.getElementById("prediction-fields");
   if (!container || container.dataset.loaded === "1") return;
 
   try {
-    const res = await fetch("/feature-config");
+    const res = await fetch("/feature-defaults");
     if (!res.ok) throw new Error(String(res.status));
     const data = await res.json();
-    const names = data.top_features || [];
-    const defaults = data.defaults || {};
-    predictionFeatureNames = names;
-    predictionDefaults = defaults;
 
-    if (names.length === 0) {
-      container.innerHTML =
-        "<p class=\"prediction-fields-error\">No top features configured. Run training.</p>";
+    _allColumns = data.columns || [];
+    _allMedians = data.medians || {};
+    const top5  = data.top5   || [];
+
+    if (top5.length === 0) {
+      container.innerHTML = "<p class='prediction-fields-loading'>No features found. Run training first.</p>";
       return;
     }
 
-    container.innerHTML = names
-      .map((name, i) => {
-        const def = defaults[name];
-        const defStr =
-          def !== undefined && def !== null && Number.isFinite(Number(def))
-            ? Number(def)
-            : "";
-        const id = `pred-field-${i}`;
-        const safeLabel = escapeHtml(name);
-        const valAttr =
-          defStr === "" ? "" : ` value="${String(defStr)}" placeholder="${String(defStr)}"`;
-        return `<div class="prediction-field-row">
-  <label class="prediction-field-label" for="${id}">${safeLabel}</label>
-  <input type="number" step="any" class="prediction-field-input" id="${id}" data-feature="${i}"${valAttr} />
-</div>`;
-      })
-      .join("");
+    container.innerHTML = top5.map((f, i) => `
+      <div class="feat-card">
+        <div class="feat-card-label">
+          <span>${escapeHtml(f.label)}</span>
+          ${f.tooltip ? `<span class="feat-tooltip-icon" title="${escapeHtml(f.tooltip)}">ℹ</span>` : ""}
+        </div>
+        <input
+          type="number" step="any"
+          class="feat-card-input"
+          id="feat-${i}"
+          data-name="${escapeHtml(f.name)}"
+          value="${f.median}"
+          placeholder="${f.median}"
+        />
+      </div>`
+    ).join("");
 
     container.dataset.loaded = "1";
   } catch (e) {
     console.error(e);
-    container.innerHTML =
-      "<p class=\"prediction-fields-error\">Could not load feature inputs. Is the API running?</p>";
+    container.innerHTML = "<p class='prediction-fields-loading'>Could not load feature inputs.</p>";
   }
 }
 
 // ── Prediction ──
-/**
- * POST /predict sends a JSON object (not an array), e.g.
- * { "feature1": 0.5, "feature2": 1.2, ... }
- * Keys are real column names from the server; values are numbers.
- */
 async function predict() {
   const container = document.getElementById("prediction-fields");
   if (!container || container.dataset.loaded !== "1") {
-    showError("Feature inputs are not ready yet. Open the Prediction tab and wait for fields to load.");
+    showError("Feature inputs are not ready yet.");
     return;
   }
 
-  const inputs = container.querySelectorAll(".prediction-field-input");
-  /** @type {Record<string, number>} */
-  const body = {};
+  // Start with all 753 median defaults
+  const featureMap = { ..._allMedians };
 
-  for (let i = 0; i < predictionFeatureNames.length; i++) {
-    const name = predictionFeatureNames[i];
-    const el = inputs[i];
-    if (!el) continue;
-    const raw = el.value.trim();
-    if (raw === "") {
-      body[name] = Number(predictionDefaults[name]);
-      continue;
-    }
+  // Override with user-edited values
+  const inputs = container.querySelectorAll(".feat-card-input");
+  for (const input of inputs) {
+    const name = input.dataset.name;
+    const raw  = input.value.trim();
+    if (raw === "") continue;
     const num = Number(raw);
-    if (Number.isNaN(num)) {
-      showError(`Invalid number for ${name}.`);
+    if (isNaN(num)) {
+      showError(`Invalid number for "${name}". Please enter a numeric value.`);
       return;
     }
-    body[name] = num;
+    featureMap[name] = num;
   }
 
-  if (Object.keys(body).length === 0) {
-    showError("No features to send.");
+  // Build ordered array matching column_order
+  if (_allColumns.length === 0) {
+    showError("Column order not loaded. Please refresh the page.");
     return;
   }
+  const features = _allColumns.map(col => featureMap[col] ?? 0);
 
   setLoading(true);
-
   try {
     const response = await fetch("/predict", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
+      body: JSON.stringify({ features }),
     });
-
     if (!response.ok) throw new Error("Server error: " + response.status);
-
     const data = await response.json();
     renderResult(data);
     renderShapChart(data.top_contributions);
