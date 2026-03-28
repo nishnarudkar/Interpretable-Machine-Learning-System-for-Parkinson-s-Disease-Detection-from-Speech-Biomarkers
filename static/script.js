@@ -30,21 +30,28 @@ async function loadTopFeatures() {
 // ── Prediction ──
 async function predict() {
   const input = document.getElementById("inputFeatures").value.trim();
-  if (!input) return;
 
-  const features = input.split(",").map(Number);
-  if (features.some(isNaN)) {
-    showError("Please enter valid comma-separated numbers.");
+  // Validation: empty check
+  if (!input) {
+    showError("Invalid input. Please enter numeric comma-separated values.");
     return;
   }
 
+  // Validation: parse and check all values are numeric
+  const features = input.split(",").map(v => v.trim());
+  if (features.some(v => v === "" || isNaN(Number(v)))) {
+    showError("Invalid input. Please enter numeric comma-separated values.");
+    return;
+  }
+
+  const numericFeatures = features.map(Number);
   setLoading(true);
 
   try {
     const response = await fetch("/predict", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ features })
+      body: JSON.stringify({ features: numericFeatures })
     });
 
     if (!response.ok) throw new Error("Server error: " + response.status);
