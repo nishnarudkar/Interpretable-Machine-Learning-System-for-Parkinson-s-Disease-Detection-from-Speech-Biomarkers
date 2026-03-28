@@ -92,6 +92,40 @@ body {
   box-shadow: 0 0 16px rgba(108, 99, 255, 0.2);
 }
 
+/* ── Authors ── */
+.authors-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.authors-label {
+  margin-right: 4px;
+  opacity: 0.8;
+}
+
+.authors-section a {
+  color: var(--muted);
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-out);
+  font-weight: 500;
+}
+
+.authors-section a:hover {
+  color: var(--accent2);
+}
+
+.dot-separator {
+  color: var(--border);
+  font-size: 0.8rem;
+}
+
 /* ── Tab Nav ── */
 .tab-nav {
   display: flex;
