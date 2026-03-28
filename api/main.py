@@ -1,12 +1,11 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Body
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field
-from typing import Annotated, List
+from typing import Any, Dict
+import json
 import joblib
 import numpy as np
-import pandas as pd
 import shap
 import sys
 import logging
@@ -23,6 +22,7 @@ from src.config import (
     load_dataset,
     MODEL_PATH, SCALER_PATH, SELECTOR_PATH, FEATURE_NAMES_PATH,
     TEMPLATES_DIR, STATIC_DIR, EXPECTED_RAW_FEATURES, MODELS_DIR,
+    FEATURE_CONFIG_PATH,
 )
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.tree import DecisionTreeClassifier
@@ -112,6 +112,7 @@ try:
     selector      = joblib.load(SELECTOR_PATH)
     feature_names = joblib.load(FEATURE_NAMES_PATH)
     column_order  = joblib.load(COLUMN_ORDER_PATH)
+    COLUMN_ORDER_SET = frozenset(column_order)
 
     # Validate the preprocessing chain is internally consistent
     assert len(column_order) == EXPECTED_RAW_FEATURES, (
@@ -127,6 +128,21 @@ try:
     explainer = build_explainer(model, selector, scaler)
     logger.info(f"Loaded: {type(model).__name__} + {type(explainer).__name__}")
 
+    if not FEATURE_CONFIG_PATH.is_file():
+        raise RuntimeError(
+            f"feature_config.json not found at {FEATURE_CONFIG_PATH}. Run `python src/train.py` first."
+        )
+    with open(FEATURE_CONFIG_PATH, encoding="utf-8") as f:
+        _fc = json.load(f)
+    DEFAULT_FEATURE_VALUES = {str(k): float(v) for k, v in _fc["default_values"].items()}
+    TOP_FEATURE_NAMES = list(_fc["top_features"])
+    _missing_defaults = [c for c in column_order if c not in DEFAULT_FEATURE_VALUES]
+    if _missing_defaults:
+        raise RuntimeError(
+            f"feature_config.json missing default_values for {len(_missing_defaults)} column(s), "
+            f"e.g. {_missing_defaults[:3]!r}. Re-run training."
+        )
+
 except FileNotFoundError as e:
     raise RuntimeError(
         f"Model artifact not found: {e}. Run `python src/train.py` first."
@@ -136,20 +152,43 @@ except AssertionError as e:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-class FeatureInput(BaseModel):
+def _build_feature_vector(body: Dict[str, Any]) -> np.ndarray:
     """
-    Strictly typed input — Pydantic enforces exactly EXPECTED_RAW_FEATURES
-    float values at the schema level before any ML code runs.
-    Wrong length → 422 Unprocessable Entity.
+    Build shape (1, n_features) aligned to column_order.
+    User overrides by feature name; any omitted column uses DEFAULT_FEATURE_VALUES.
     """
-    features: Annotated[
-        List[float],
-        Field(
-            min_length=EXPECTED_RAW_FEATURES,
-            max_length=EXPECTED_RAW_FEATURES,
-            description=f"Exactly {EXPECTED_RAW_FEATURES} numeric speech feature values",
-        ),
-    ]
+    for key in body:
+        if key not in COLUMN_ORDER_SET:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unknown feature name: {key!r}.",
+            )
+    row_vals = []
+    for col in column_order:
+        if col in body:
+            try:
+                row_vals.append(float(body[col]))
+            except (TypeError, ValueError):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Non-numeric value for feature {col!r}.",
+                ) from None
+        else:
+            row_vals.append(DEFAULT_FEATURE_VALUES[col])
+    return np.array([row_vals], dtype=np.float64)
+
+
+@app.get("/feature-config")
+def get_feature_config():
+    """Top-importance feature names, their training means (defaults), and raw feature count."""
+    defaults_top = {
+        name: DEFAULT_FEATURE_VALUES[name] for name in TOP_FEATURE_NAMES
+    }
+    return {
+        "top_features": TOP_FEATURE_NAMES,
+        "defaults":     defaults_top,
+        "n_features":   len(column_order),
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -158,10 +197,13 @@ def home(request: Request):
 
 
 @app.post("/predict")
-def predict(data: FeatureInput):
+def predict(body: Dict[str, Any] = Body(...)):
+    """
+    JSON body: map of feature column name → numeric value (subset allowed).
+    Missing columns are filled from artifacts/feature_config.json default_values (train means).
+    """
     try:
-        # Align to training column order to prevent silent feature mismatch
-        arr = pd.DataFrame([data.features], columns=column_order).values
+        arr = _build_feature_vector(body)
 
         # Preprocessing: select → scale  (matches train.py order)
         arr_selected = selector.transform(arr)        # 753 → 100 features
@@ -219,6 +261,8 @@ def predict(data: FeatureInput):
             "shap_bar_url":      "/static/shap_bar.png",
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Prediction error")
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
@@ -226,17 +270,32 @@ def predict(data: FeatureInput):
 
 @app.get("/model-comparison")
 def model_comparison():
-    """Return model comparison data from the last training run."""
-    # Results from the notebook experimentation with SMOTE + RandomizedSearchCV
-    # These are the actual scores logged to MLflow during training
-    models = [
-        {"model": "XGBoost",             "accuracy": 0.89, "macro_f1": 0.855, "roc_auc": 0.946, "selected": True},
-        {"model": "SVM",                 "accuracy": 0.87, "macro_f1": 0.833, "roc_auc": 0.920, "selected": False},
-        {"model": "Random Forest",       "accuracy": 0.87, "macro_f1": 0.828, "roc_auc": 0.931, "selected": False},
-        {"model": "KNN",                 "accuracy": 0.83, "macro_f1": 0.804, "roc_auc": 0.947, "selected": False},
-        {"model": "Logistic Regression", "accuracy": 0.82, "macro_f1": 0.776, "roc_auc": 0.859, "selected": False},
-        {"model": "Decision Tree",       "accuracy": 0.84, "macro_f1": 0.766, "roc_auc": 0.747, "selected": False},
-    ]
+    """
+    Latest metrics per model from MLflow (newest run per model name), sorted by
+    roc_auc descending. ``selected`` follows ``src.model_selection``: prefer
+    interpretable models (XGBoost, Random Forest, Decision Tree) ranked by
+    0.6*roc_auc + 0.4*macro_f1, else fall back with a penalty on non-interpretable models.
+    """
+    from src.mlflow_comparison import fetch_model_comparison_from_mlflow
+
+    try:
+        models = fetch_model_comparison_from_mlflow()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("MLflow model comparison failed")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Could not load metrics from MLflow: {e}",
+        ) from e
+    if not models:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "No model runs with accuracy, macro_f1, and roc_auc found in MLflow. "
+                "Run training to log metrics."
+            ),
+        )
     return {"models": models}
 
 

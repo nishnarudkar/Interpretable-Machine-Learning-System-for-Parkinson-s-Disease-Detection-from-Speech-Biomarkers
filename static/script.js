@@ -6,7 +6,12 @@ function openTab(tab, btn) {
   if (btn) btn.classList.add("active");
   if (tab === "importance") loadTopFeatures();
   if (tab === "comparison") loadModelComparison();
+  if (tab === "prediction") loadPredictionFields();
 }
+
+/** Top-5 feature names and defaults from /feature-config (filled after first fetch). */
+let predictionFeatureNames = [];
+let predictionDefaults = {};
 
 // ── Top features list ──
 async function loadTopFeatures() {
@@ -28,31 +33,98 @@ async function loadTopFeatures() {
   }
 }
 
+// ── Prediction inputs (top 5 features) ──
+async function loadPredictionFields() {
+  const container = document.getElementById("prediction-fields");
+  if (!container || container.dataset.loaded === "1") return;
+
+  try {
+    const res = await fetch("/feature-config");
+    if (!res.ok) throw new Error(String(res.status));
+    const data = await res.json();
+    const names = data.top_features || [];
+    const defaults = data.defaults || {};
+    predictionFeatureNames = names;
+    predictionDefaults = defaults;
+
+    if (names.length === 0) {
+      container.innerHTML =
+        "<p class=\"prediction-fields-error\">No top features configured. Run training.</p>";
+      return;
+    }
+
+    container.innerHTML = names
+      .map((name, i) => {
+        const def = defaults[name];
+        const defStr =
+          def !== undefined && def !== null && Number.isFinite(Number(def))
+            ? Number(def)
+            : "";
+        const id = `pred-field-${i}`;
+        const safeLabel = escapeHtml(name);
+        const valAttr =
+          defStr === "" ? "" : ` value="${String(defStr)}" placeholder="${String(defStr)}"`;
+        return `<div class="prediction-field-row">
+  <label class="prediction-field-label" for="${id}">${safeLabel}</label>
+  <input type="number" step="any" class="prediction-field-input" id="${id}" data-feature="${i}"${valAttr} />
+</div>`;
+      })
+      .join("");
+
+    container.dataset.loaded = "1";
+  } catch (e) {
+    console.error(e);
+    container.innerHTML =
+      "<p class=\"prediction-fields-error\">Could not load feature inputs. Is the API running?</p>";
+  }
+}
+
 // ── Prediction ──
+/**
+ * POST /predict sends a JSON object (not an array), e.g.
+ * { "feature1": 0.5, "feature2": 1.2, ... }
+ * Keys are real column names from the server; values are numbers.
+ */
 async function predict() {
-  const input = document.getElementById("inputFeatures").value.trim();
-
-  // Validation: empty check
-  if (!input) {
-    showError("Invalid input. Please enter numeric comma-separated values.");
+  const container = document.getElementById("prediction-fields");
+  if (!container || container.dataset.loaded !== "1") {
+    showError("Feature inputs are not ready yet. Open the Prediction tab and wait for fields to load.");
     return;
   }
 
-  // Validation: parse and check all values are numeric
-  const features = input.split(",").map(v => v.trim());
-  if (features.some(v => v === "" || isNaN(Number(v)))) {
-    showError("Invalid input. Please enter numeric comma-separated values.");
+  const inputs = container.querySelectorAll(".prediction-field-input");
+  /** @type {Record<string, number>} */
+  const body = {};
+
+  for (let i = 0; i < predictionFeatureNames.length; i++) {
+    const name = predictionFeatureNames[i];
+    const el = inputs[i];
+    if (!el) continue;
+    const raw = el.value.trim();
+    if (raw === "") {
+      body[name] = Number(predictionDefaults[name]);
+      continue;
+    }
+    const num = Number(raw);
+    if (Number.isNaN(num)) {
+      showError(`Invalid number for ${name}.`);
+      return;
+    }
+    body[name] = num;
+  }
+
+  if (Object.keys(body).length === 0) {
+    showError("No features to send.");
     return;
   }
 
-  const numericFeatures = features.map(Number);
   setLoading(true);
 
   try {
     const response = await fetch("/predict", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ features: numericFeatures })
+      body: JSON.stringify(body)
     });
 
     if (!response.ok) throw new Error("Server error: " + response.status);
@@ -114,25 +186,106 @@ function renderShapImage(url) {
   wrapper.classList.remove("hidden");
 }
 
-// ── Model comparison table ──
+// ── Model comparison (from GET /model-comparison) ──
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function apiErrorDetail(data) {
+  if (!data || typeof data !== "object") return null;
+  const d = data.detail;
+  if (typeof d === "string") return d;
+  if (Array.isArray(d))
+    return d.map(e => (e && e.msg ? e.msg : String(e))).join(" ");
+  return null;
+}
+
+function num(v, decimals) {
+  const n = typeof v === "number" ? v : parseFloat(v);
+  return Number.isFinite(n) ? n.toFixed(decimals) : "—";
+}
+
 async function loadModelComparison() {
   const tbody = document.getElementById("comparison-tbody");
-  if (!tbody || tbody.dataset.loaded) return;
+  const noteEl = document.getElementById("comparison-note");
+  if (!tbody) return;
+
+  tbody.innerHTML =
+    "<tr><td colspan=\"3\" class=\"table-loading\">Loading model comparison…</td></tr>";
+  if (noteEl) {
+    noteEl.hidden = true;
+    noteEl.textContent = "";
+  }
+
   try {
-    const res  = await fetch("/model-comparison");
-    const data = await res.json();
-    tbody.innerHTML = data.models.map(m => {
-      const selected = m.selected || m.model === "XGBoost";
-      return `
-      <tr class="${selected ? "row-selected" : ""}">
-        <td>${selected ? "⭐ " : ""}${m.model}</td>
-        <td>${m.roc_auc.toFixed(3)}</td>
-        <td>${m.macro_f1.toFixed(3)}</td>
+    const res = await fetch("/model-comparison", { cache: "no-store" });
+    let data = {};
+    try {
+      data = await res.json();
+    } catch {
+      tbody.innerHTML =
+        "<tr><td colspan=\"3\" class=\"table-error\">Invalid response from server.</td></tr>";
+      return;
+    }
+
+    if (!res.ok) {
+      const msg =
+        apiErrorDetail(data) ||
+        (typeof data === "string" ? data : null) ||
+        `Could not load model comparison (HTTP ${res.status}).`;
+      tbody.innerHTML =
+        `<tr><td colspan="3" class="table-error">${escapeHtml(msg)}</td></tr>`;
+      return;
+    }
+
+    const models = data.models;
+    if (!Array.isArray(models) || models.length === 0) {
+      tbody.innerHTML =
+        "<tr><td colspan='3' class='table-error'>No models in response.</td></tr>";
+      return;
+    }
+
+    const rocVals = models.map(m => parseFloat(m.roc_auc));
+    const f1Vals = models.map(m => parseFloat(m.macro_f1));
+    const maxRoc = Math.max(...rocVals.filter(Number.isFinite));
+    const maxF1 = Math.max(...f1Vals.filter(Number.isFinite));
+
+    tbody.innerHTML = models
+      .map(m => {
+        const roc = parseFloat(m.roc_auc);
+        const f1 = parseFloat(m.macro_f1);
+        const selected = m.selected === true;
+        const bestRoc = Number.isFinite(roc) && roc === maxRoc;
+        const bestF1 = Number.isFinite(f1) && f1 === maxF1;
+        const rowClass = selected ? "row-selected" : "";
+        const star = selected
+          ? '<span class="model-star" title="Selected model" aria-hidden="true">★</span>'
+          : "";
+        const name = escapeHtml(m.model);
+        return `
+      <tr class="${rowClass}"${selected ? ' data-selected="true"' : ""}>
+        <td class="col-model">${star}<span class="model-name">${name}</span></td>
+        <td class="col-metric ${bestRoc ? "cell-best-roc" : ""}">${num(m.roc_auc, 3)}</td>
+        <td class="col-metric ${bestF1 ? "cell-best-f1" : ""}">${num(m.macro_f1, 3)}</td>
       </tr>`;
-    }).join("");
-    tbody.dataset.loaded = "1";
-  } catch {
-    tbody.innerHTML = "<tr><td colspan='3'>Could not load data.</td></tr>";
+      })
+      .join("");
+
+    if (noteEl) {
+      const sel = models.find(x => x.selected === true);
+      noteEl.textContent = sel
+        ? `${sel.model} selected for interpretability and stable performance`
+        : "Selection follows the best test-set metrics from training.";
+      noteEl.hidden = false;
+    }
+  } catch (err) {
+    console.error(err);
+    tbody.innerHTML =
+      "<tr><td colspan=\"3\" class=\"table-error\">Could not reach the API. Check that the server is running.</td></tr>";
   }
 }
 function renderTopInfluencing(contributions) {

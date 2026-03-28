@@ -3,7 +3,16 @@ Central configuration — all file paths resolved relative to the project root.
 This ensures scripts work correctly regardless of where they are invoked from
 (local dev, Docker container, CI/CD agent).
 """
+import os
 from pathlib import Path
+
+# ── MLflow (API reads experiment metrics; training also uses these) ───────────
+MLFLOW_TRACKING_URI = os.getenv(
+    "MLFLOW_TRACKING_URI",
+    "https://dagshub.com/nishnarudkar/"
+    "Interpretable-Machine-Learning-System-for-Parkinson-s-Disease-Detection-from-Speech-Biomarkers.mlflow",
+)
+MLFLOW_EXPERIMENT_NAME = os.getenv("MLFLOW_EXPERIMENT_NAME", "parkinson_detection")
 
 # Project root = parent of this file's directory (src/)
 ROOT = Path(__file__).resolve().parent.parent
@@ -24,6 +33,11 @@ DROP_COLUMNS   = ["id"]
 
 # Expected number of raw feature columns after dropping id/class
 EXPECTED_RAW_FEATURES = 753
+
+# ── Training outputs (metrics, reports) ───────────────────────────────────────
+ARTIFACTS_DIR       = ROOT / "artifacts"
+MODEL_METRICS_PATH  = ARTIFACTS_DIR / "model_metrics.json"
+FEATURE_CONFIG_PATH = ARTIFACTS_DIR / "feature_config.json"
 
 # ── Model artifacts ───────────────────────────────────────────────────────────
 MODELS_DIR         = ROOT / "models"

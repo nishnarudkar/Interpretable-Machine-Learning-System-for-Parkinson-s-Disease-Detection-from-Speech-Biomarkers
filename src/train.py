@@ -1,4 +1,5 @@
 import os
+import json
 import warnings
 import sys
 from pathlib import Path
@@ -8,7 +9,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.config import (
     load_dataset, MODELS_DIR,
     MODEL_PATH, SCALER_PATH, SELECTOR_PATH, FEATURE_NAMES_PATH,
+    ARTIFACTS_DIR, MODEL_METRICS_PATH, FEATURE_CONFIG_PATH,
 )
+from src.model_selection import apply_selection_flags
 
 COLUMN_ORDER_PATH = MODELS_DIR / "column_order.pkl"
 
@@ -410,6 +413,36 @@ if xgb_metrics["macro_f1"] > best_f1:
 
 
 # --------------------------------
+# Persist model comparison metrics (held-out test set)
+# --------------------------------
+def _metrics_row(display_name: str, metrics: dict) -> dict:
+    return {
+        "model":    display_name,
+        "accuracy": float(metrics["accuracy"]),
+        "macro_f1": float(metrics["macro_f1"]),
+        "roc_auc":  float(metrics["roc_auc"]),
+        "selected": False,
+    }
+
+
+model_metrics_rows = [
+    _metrics_row("Logistic Regression", lr_metrics),
+    _metrics_row("Random Forest",       rf_metrics),
+    _metrics_row("SVM",                 svm_metrics),
+    _metrics_row("KNN",                 knn_metrics),
+    _metrics_row("Decision Tree",       dt_metrics),
+    _metrics_row("XGBoost",             xgb_metrics),
+]
+
+apply_selection_flags(model_metrics_rows)
+
+ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+with open(MODEL_METRICS_PATH, "w", encoding="utf-8") as f:
+    json.dump(model_metrics_rows, f, indent=2)
+print(f"\nSaved model comparison metrics: {MODEL_METRICS_PATH}")
+
+
+# --------------------------------
 # Save artifacts for API
 # --------------------------------
 # XGBoost is always used as the production model regardless of leaderboard rank.
@@ -422,6 +455,20 @@ production_model = best_tuned_xgb
 print(f"\nLeaderboard winner:  {type(best_model).__name__} (macro F1: {best_f1:.4f})")
 print(f"Production model:    XGBoost_tuned (macro F1: {xgb_metrics['macro_f1']:.4f})")
 print(f"Reason: XGBoost selected for interpretability (SHAP TreeExplainer) in medical context.")
+
+# Top 5 features by production XGBoost feature_importances_; default_values = train-split means (raw)
+imp = np.asarray(production_model.feature_importances_)
+top5_idx = np.argsort(imp)[::-1][:5]
+top_features = [selected_feature_names[i] for i in top5_idx]
+feature_config = {
+    "top_features": top_features,
+    # Train-split means (raw) for every column — used by API to fill missing features
+    "default_values": {col: float(X_train[col].mean()) for col in X.columns},
+}
+with open(FEATURE_CONFIG_PATH, "w", encoding="utf-8") as f:
+    json.dump(feature_config, f, indent=2)
+print(f"Saved feature config: {FEATURE_CONFIG_PATH}")
+
 os.makedirs(MODELS_DIR, exist_ok=True)
 joblib.dump(production_model,       MODEL_PATH)
 joblib.dump(scaler,                 SCALER_PATH)

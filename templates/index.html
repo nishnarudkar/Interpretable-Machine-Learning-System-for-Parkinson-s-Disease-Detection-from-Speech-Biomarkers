@@ -86,16 +86,29 @@
       <div class="card">
         <div class="card-header">
           <h2>Parkinson's Disease Prediction</h2>
-          <p>Enter comma-separated speech feature values to get a prediction with SHAP-based explanation.</p>
+          <p>Edit the top five speech biomarkers (by model importance). Other features use training-set means automatically.</p>
         </div>
 
-        <div class="input-section">
-          <label for="inputFeatures">Speech Feature Vector</label>
-          <textarea
-            id="inputFeatures"
-            rows="4"
-            placeholder="Example: 0.85,0.71,0.57,240,239,0.003,0.0004,0.01,..."
-          ></textarea>
+        <div class="input-section prediction-input-section">
+          <p class="prediction-helper-text">
+            Only top 5 biomarkers are required. Remaining features are automatically handled by the model.
+            <span class="prediction-tooltip-wrap">
+              <button
+                type="button"
+                class="prediction-help-btn"
+                aria-describedby="prediction-shap-tooltip"
+              >
+                <span class="visually-hidden">Why these five features?</span>
+                <span class="prediction-help-icon" aria-hidden="true">i</span>
+              </button>
+              <span id="prediction-shap-tooltip" class="prediction-tooltip-bubble" role="tooltip">
+                These features were selected based on SHAP importance.
+              </span>
+            </span>
+          </p>
+          <div id="prediction-fields" class="prediction-fields" aria-live="polite">
+            <p class="prediction-fields-loading">Loading feature inputs…</p>
+          </div>
           <button class="predict-btn" onclick="predict()">
             <span id="btn-text">Run Prediction</span>
             <span id="btn-spinner" class="spinner hidden"></span>
@@ -140,15 +153,16 @@
       <div class="card">
         <div class="card-header">
           <h2>Model Comparison</h2>
-          <p>All models trained with RandomizedSearchCV + SMOTE. Metrics are macro-averaged on the held-out test set.</p>
+          <p class="card-desc">Models were trained using SMOTE for class balancing and tuned using RandomizedSearchCV.</p>
+          <p class="card-desc">Evaluation is performed on a held-out test set using ROC AUC and Macro F1.</p>
         </div>
-        <div class="table-wrapper">
+        <div class="table-wrapper comparison-table-panel" role="region" aria-label="Model comparison results">
           <table class="comparison-table" id="comparison-table">
             <thead>
               <tr>
-                <th>Model</th>
-                <th>ROC AUC</th>
-                <th>Macro F1</th>
+                <th scope="col" class="th-model">Model</th>
+                <th scope="col" class="th-metric">ROC AUC</th>
+                <th scope="col" class="th-metric">Macro F1</th>
               </tr>
             </thead>
             <tbody id="comparison-tbody">
@@ -156,9 +170,16 @@
             </tbody>
           </table>
         </div>
-        <p class="comparison-note">
-          XGBoost selected for interpretability and stable performance
-        </p>
+        <p class="comparison-note" id="comparison-note" hidden></p>
+
+        <aside class="model-selection-insight" aria-labelledby="model-selection-insight-heading">
+          <h3 class="model-selection-insight-title" id="model-selection-insight-heading">Model Selection Insight</h3>
+          <div class="model-selection-insight-body">
+            <p>Although SVM achieved the highest ROC AUC and KNN showed strong Macro F1 performance, XGBoost was selected as the final model.</p>
+            <p>This is because XGBoost provides a strong balance between performance and interpretability. In medical applications, understanding model decisions is critical, and XGBoost allows extraction of meaningful speech biomarkers using SHAP explanations.</p>
+            <p>Therefore, XGBoost is used for prediction and explainability in this system.</p>
+          </div>
+        </aside>
       </div>
     </div>
 
