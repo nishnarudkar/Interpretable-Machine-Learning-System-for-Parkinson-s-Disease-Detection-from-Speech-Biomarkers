@@ -60,6 +60,7 @@ async function predict() {
     renderResult(data);
     renderShapChart(data.top_contributions);
     if (data.shap_bar_url) renderShapImage(data.shap_bar_url);
+    if (data.top_contributions) renderTopInfluencing(data.top_contributions);
   } catch (err) {
     showError("Prediction failed. Check the server and try again.");
     console.error(err);
@@ -108,9 +109,25 @@ function showError(msg) {
 function renderShapImage(url) {
   const wrapper = document.getElementById("shap-img-wrapper");
   const img     = document.getElementById("shap-bar-img");
-  // Append cache-buster so the browser reloads the image on each prediction
   img.src = url + "?t=" + Date.now();
   wrapper.classList.remove("hidden");
+}
+
+// ── Top influencing features list (from per-prediction SHAP) ──
+function renderTopInfluencing(contributions) {
+  const section = document.getElementById("top-influencing");
+  const list    = document.getElementById("top-influencing-list");
+  const top5    = contributions.slice(0, 5);
+  list.innerHTML = top5.map((f, i) =>
+    `<li>
+      <span class="feat-rank">#${i + 1}</span>
+      <span class="feat-name">${f.feature_name || "Feature " + f.feature_index}</span>
+      <span class="feat-score" style="color:${f.impact >= 0 ? "#f87171" : "#34d399"}">
+        ${f.impact >= 0 ? "▲" : "▼"} ${Math.abs(f.impact).toFixed(4)}
+      </span>
+    </li>`
+  ).join("");
+  section.classList.remove("hidden");
 }
 
 // ── SHAP Chart ──
