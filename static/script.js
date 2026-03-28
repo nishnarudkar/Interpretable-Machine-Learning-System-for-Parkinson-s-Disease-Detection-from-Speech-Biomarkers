@@ -69,6 +69,9 @@ async function loadPredictionFields() {
           value="${f.median}"
           placeholder="${f.median}"
         />
+        ${(f.min !== undefined && f.max !== undefined)
+          ? `<span class="feat-range">Range: ${f.min} – ${f.max}</span>`
+          : ""}
       </div>`
     ).join("");
 

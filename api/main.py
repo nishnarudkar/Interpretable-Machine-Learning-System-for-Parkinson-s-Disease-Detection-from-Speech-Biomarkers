@@ -197,13 +197,10 @@ def home(request: Request):
 
 
 @app.post("/predict")
-def predict(body: Dict[str, Any] = Body(...)):
-    """
-    JSON body: map of feature column name → numeric value (subset allowed).
-    Missing columns are filled from artifacts/feature_config.json default_values (train means).
-    """
+def predict(data: FeatureInput):
+    """Accept a list of 753 features in column_order."""
     try:
-        arr = _build_feature_vector(body)
+        arr = pd.DataFrame([data.features], columns=column_order).values
 
         # Preprocessing: select → scale  (matches train.py order)
         arr_selected = selector.transform(arr)        # 753 → 100 features
@@ -270,7 +267,7 @@ def predict(body: Dict[str, Any] = Body(...)):
 
 @app.get("/feature-defaults")
 def feature_defaults():
-    """Return the top 5 editable features with medians + all 753 median defaults."""
+    """Return the top 5 editable features with medians, min, max + all 753 median defaults."""
     import json
     defaults_path = STATIC_DIR / "feature_medians.json"
     if not defaults_path.exists():
@@ -278,25 +275,34 @@ def feature_defaults():
     with open(defaults_path) as f:
         data = json.load(f)
 
-    # User-friendly labels for the top 5
+    # Compute min/max from the dataset for the top 5 features
+    try:
+        X_all, _ = load_dataset()
+        stats = X_all[feature_names[:5]].agg(["min", "max"]).to_dict()
+    except Exception:
+        stats = {}
+
     friendly = {
-        "maxIntensity":       {"label": "Max Intensity",          "tooltip": "Maximum vocal intensity (loudness) of the speech signal"},
-        "f2":                 {"label": "Formant F2 (Hz)",         "tooltip": "Second formant frequency — related to tongue position during speech"},
-        "mean_MFCC_2nd_coef": {"label": "MFCC Coefficient 2",     "tooltip": "2nd Mel-frequency cepstral coefficient — captures spectral shape of voice"},
-        "mean_MFCC_3rd_coef": {"label": "MFCC Coefficient 3",     "tooltip": "3rd MFCC — reflects fine spectral detail of vocal tract"},
-        "mean_MFCC_6th_coef": {"label": "MFCC Coefficient 6",     "tooltip": "6th MFCC — captures higher-order spectral variation in speech"},
+        "maxIntensity":       {"label": "Max Intensity",      "tooltip": "Maximum vocal intensity (loudness) of the speech signal"},
+        "f2":                 {"label": "Formant F2 (Hz)",     "tooltip": "Second formant frequency — related to tongue position during speech"},
+        "mean_MFCC_2nd_coef": {"label": "MFCC Coefficient 2", "tooltip": "2nd Mel-frequency cepstral coefficient — captures spectral shape of voice"},
+        "mean_MFCC_3rd_coef": {"label": "MFCC Coefficient 3", "tooltip": "3rd MFCC — reflects fine spectral detail of vocal tract"},
+        "mean_MFCC_6th_coef": {"label": "MFCC Coefficient 6", "tooltip": "6th MFCC — captures higher-order spectral variation in speech"},
     }
 
-    top5 = [
-        {
+    top5 = []
+    for name in feature_names[:5]:
+        if name not in data["medians"]:
+            continue
+        feat_stats = stats.get(name, {})
+        top5.append({
             "name":    name,
             "label":   friendly.get(name, {}).get("label", name),
             "tooltip": friendly.get(name, {}).get("tooltip", ""),
-            "median":  data["medians"][name],
-        }
-        for name in feature_names[:5]
-        if name in data["medians"]
-    ]
+            "median":  round(data["medians"][name], 4),
+            "min":     round(float(feat_stats.get("min", 0)), 4),
+            "max":     round(float(feat_stats.get("max", 0)), 4),
+        })
 
     return {
         "top5":    top5,

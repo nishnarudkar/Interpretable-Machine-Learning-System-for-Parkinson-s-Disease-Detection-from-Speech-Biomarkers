@@ -680,6 +680,12 @@ body {
   border-color: var(--accent);
 }
 
+.feat-range {
+  font-size: 0.72rem;
+  color: #5a6380;
+  margin-top: 2px;
+}
+
 @media (max-width: 520px) {
   .feature-grid { grid-template-columns: 1fr; }
 }
