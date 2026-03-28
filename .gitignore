@@ -13,8 +13,9 @@ venv/
 .venv/
 env/
 
-# Model artifacts (tracked via DVC or locally only)
-models/
+# Model artifacts — committed for Render deployment
+# (DVC tracks these for local/CI use; Render needs them in the repo)
+# models/
 
 # MLflow local backend
 mlflow.db
@@ -23,9 +24,9 @@ mlruns/
 # Data (tracked via DVC)
 data/pd_speech_features.csv
 
-# Generated static assets
-static/feature_importance.png
-static/learning_curve.png
+# Generated static assets — committed for Render deployment
+# static/feature_importance.png
+# static/learning_curve.png
 
 # Secrets — never commit
 .env
