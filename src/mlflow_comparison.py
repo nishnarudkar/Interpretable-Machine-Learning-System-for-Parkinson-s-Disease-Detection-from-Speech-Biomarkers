@@ -1,84 +1,71 @@
 """
-Latest per-model metrics from MLflow (matches run_name values in train.py).
+Fetch model comparison metrics from the saved artifacts/model_metrics.json
+(written by train.py after every training run).
+Falls back to querying MLflow directly if the file is missing.
 """
-from __future__ import annotations
+import json
+import os
+import sys
+from pathlib import Path
 
-import logging
-from typing import Any
-
-import mlflow
-from mlflow.tracking import MlflowClient
-
-from src.config import MLFLOW_EXPERIMENT_NAME, MLFLOW_TRACKING_URI
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from src.config import MODEL_METRICS_PATH, MLFLOW_TRACKING_URI, MLFLOW_EXPERIMENT_NAME
 from src.model_selection import apply_selection_flags
 
-logger = logging.getLogger("uvicorn.error")
 
-# mlflow.start_run(run_name=...) → tag mlflow.runName
-RUN_NAME_TO_DISPLAY: dict[str, str] = {
-    "LogisticRegression": "Logistic Regression",
-    "RandomForest":       "Random Forest",
-    "SVM":                "SVM",
-    "KNN":                "KNN",
-    "DecisionTree":       "Decision Tree",
-    "XGBoost_tuned":      "XGBoost",
-}
-
-REQUIRED_METRICS = ("accuracy", "macro_f1", "roc_auc")
-
-
-def fetch_model_comparison_from_mlflow() -> list[dict[str, Any]]:
+def fetch_model_comparison_from_mlflow() -> list:
     """
-    For each known model, take the latest run (by start time), read test metrics,
-    return rows sorted by roc_auc descending.
+    Returns a list of dicts:
+      { model, accuracy, macro_f1, roc_auc, selected }
 
-    Selection (selected=True): see ``model_selection.apply_selection_flags`` — interpretable
-    models first (combined score with tie-break on ROC AUC); otherwise penalized score.
-
-    Training logs: accuracy, macro_f1, roc_auc (see train.compute_metrics).
+    Strategy:
+    1. Read artifacts/model_metrics.json (fast, no network call)
+    2. If missing, query MLflow tracking server for the latest run per model name
     """
-    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-    client = MlflowClient()
+    # ── Strategy 1: local JSON written by train.py ────────────────────────────
+    if MODEL_METRICS_PATH.exists():
+        with open(MODEL_METRICS_PATH, encoding="utf-8") as f:
+            rows = json.load(f)
+        # Re-apply selection flags in case the file was written by an older version
+        apply_selection_flags(rows)
+        return rows
 
-    exp = client.get_experiment_by_name(MLFLOW_EXPERIMENT_NAME)
-    if exp is None:
-        raise FileNotFoundError(
-            f"MLflow experiment '{MLFLOW_EXPERIMENT_NAME}' not found."
+    # ── Strategy 2: query MLflow ──────────────────────────────────────────────
+    try:
+        import mlflow
+        mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+        client = mlflow.tracking.MlflowClient()
+        exp    = client.get_experiment_by_name(MLFLOW_EXPERIMENT_NAME)
+        if exp is None:
+            return []
+
+        runs = client.search_runs(
+            experiment_ids=[exp.experiment_id],
+            filter_string="",
+            order_by=["start_time DESC"],
+            max_results=200,
         )
 
-    runs = client.search_runs(
-        experiment_ids=[str(exp.experiment_id)],
-        order_by=["start_time DESC"],
-        max_results=500,
-    )
-
-    latest_by_run_name: dict[str, Any] = {}
-    for run in runs:
-        tags = getattr(run.data, "tags", None) or {}
-        raw = tags.get("mlflow.runName") or getattr(run.info, "run_name", None) or ""
-        raw = str(raw).strip()
-        if raw not in RUN_NAME_TO_DISPLAY:
-            continue
-        if raw not in latest_by_run_name:
-            latest_by_run_name[raw] = run
-
-    rows: list[dict[str, Any]] = []
-    for run_name, run in latest_by_run_name.items():
-        metrics = getattr(run.data, "metrics", None) or {}
-        missing = [k for k in REQUIRED_METRICS if k not in metrics]
-        if missing:
-            logger.warning("Skipping run %s: missing metrics %s", run_name, missing)
-            continue
-        rows.append(
-            {
-                "model":    RUN_NAME_TO_DISPLAY[run_name],
-                "accuracy": float(metrics["accuracy"]),
-                "macro_f1": float(metrics["macro_f1"]),
-                "roc_auc":  float(metrics["roc_auc"]),
+        # Keep the most recent run per model name
+        seen: dict = {}
+        for run in runs:
+            name = run.data.params.get("model", "")
+            if not name or name in seen:
+                continue
+            m = run.data.metrics
+            if not all(k in m for k in ("accuracy", "macro_f1", "roc_auc")):
+                continue
+            seen[name] = {
+                "model":    name,
+                "accuracy": round(float(m["accuracy"]),  4),
+                "macro_f1": round(float(m["macro_f1"]),  4),
+                "roc_auc":  round(float(m["roc_auc"]),   4),
                 "selected": False,
             }
-        )
 
-    rows.sort(key=lambda r: r["roc_auc"], reverse=True)
-    apply_selection_flags(rows)
-    return rows
+        rows = sorted(seen.values(), key=lambda r: r["roc_auc"], reverse=True)
+        apply_selection_flags(rows)
+        return rows
+
+    except Exception as exc:
+        raise RuntimeError(f"MLflow query failed: {exc}") from exc

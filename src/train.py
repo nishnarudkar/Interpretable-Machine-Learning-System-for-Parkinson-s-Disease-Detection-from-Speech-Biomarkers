@@ -476,6 +476,22 @@ joblib.dump(selector,               SELECTOR_PATH)
 joblib.dump(selected_feature_names, FEATURE_NAMES_PATH)
 joblib.dump(list(X.columns),        COLUMN_ORDER_PATH)
 
+# ── Generate feature_medians.json for the API prediction form ─────────────────
+import json as _json
+from src.config import STATIC_DIR as _STATIC_DIR
+
+_STATIC_DIR.mkdir(parents=True, exist_ok=True)
+_medians = X.median().to_dict()
+_feature_medians = {
+    "columns": list(X.columns),
+    "medians": {col: float(_medians[col]) for col in X.columns},
+}
+_medians_path = _STATIC_DIR / "feature_medians.json"
+with open(_medians_path, "w", encoding="utf-8") as _f:
+    _json.dump(_feature_medians, _f, indent=2)
+print(f"Saved feature medians: {_medians_path}")
+# ─────────────────────────────────────────────────────────────────────────────
+
 print(f"\nProduction model saved: {type(production_model).__name__}")
 print(f"Saved feature names: {len(selected_feature_names)} features")
 print(f"Saved column order:  {len(list(X.columns))} columns")

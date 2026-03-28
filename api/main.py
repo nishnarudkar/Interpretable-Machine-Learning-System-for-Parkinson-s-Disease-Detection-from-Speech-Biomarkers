@@ -24,7 +24,6 @@ from src.config import (
     load_dataset,
     MODEL_PATH, SCALER_PATH, SELECTOR_PATH, FEATURE_NAMES_PATH,
     TEMPLATES_DIR, STATIC_DIR, EXPECTED_RAW_FEATURES, MODELS_DIR,
-    FEATURE_CONFIG_PATH,
 )
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.tree import DecisionTreeClassifier
@@ -142,21 +141,6 @@ try:
     explainer = build_explainer(model, selector, scaler)
     logger.info(f"Loaded: {type(model).__name__} + {type(explainer).__name__}")
 
-    if not FEATURE_CONFIG_PATH.is_file():
-        raise RuntimeError(
-            f"feature_config.json not found at {FEATURE_CONFIG_PATH}. Run `python src/train.py` first."
-        )
-    with open(FEATURE_CONFIG_PATH, encoding="utf-8") as f:
-        _fc = json.load(f)
-    DEFAULT_FEATURE_VALUES = {str(k): float(v) for k, v in _fc["default_values"].items()}
-    TOP_FEATURE_NAMES = list(_fc["top_features"])
-    _missing_defaults = [c for c in column_order if c not in DEFAULT_FEATURE_VALUES]
-    if _missing_defaults:
-        raise RuntimeError(
-            f"feature_config.json missing default_values for {len(_missing_defaults)} column(s), "
-            f"e.g. {_missing_defaults[:3]!r}. Re-run training."
-        )
-
 except FileNotFoundError as e:
     raise RuntimeError(
         f"Model artifact not found: {e}. Run `python src/train.py` first."
@@ -164,45 +148,6 @@ except FileNotFoundError as e:
 except AssertionError as e:
     raise RuntimeError(f"Artifact consistency check failed: {e}")
 # ─────────────────────────────────────────────────────────────────────────────
-
-
-def _build_feature_vector(body: Dict[str, Any]) -> np.ndarray:
-    """
-    Build shape (1, n_features) aligned to column_order.
-    User overrides by feature name; any omitted column uses DEFAULT_FEATURE_VALUES.
-    """
-    for key in body:
-        if key not in COLUMN_ORDER_SET:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Unknown feature name: {key!r}.",
-            )
-    row_vals = []
-    for col in column_order:
-        if col in body:
-            try:
-                row_vals.append(float(body[col]))
-            except (TypeError, ValueError):
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"Non-numeric value for feature {col!r}.",
-                ) from None
-        else:
-            row_vals.append(DEFAULT_FEATURE_VALUES[col])
-    return np.array([row_vals], dtype=np.float64)
-
-
-@app.get("/feature-config")
-def get_feature_config():
-    """Top-importance feature names, their training means (defaults), and raw feature count."""
-    defaults_top = {
-        name: DEFAULT_FEATURE_VALUES[name] for name in TOP_FEATURE_NAMES
-    }
-    return {
-        "top_features": TOP_FEATURE_NAMES,
-        "defaults":     defaults_top,
-        "n_features":   len(column_order),
-    }
 
 
 @app.get("/", response_class=HTMLResponse)
