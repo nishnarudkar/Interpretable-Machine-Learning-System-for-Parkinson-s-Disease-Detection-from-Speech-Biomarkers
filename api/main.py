@@ -281,7 +281,7 @@ def predict(data: FeatureInput):
 
 @app.get("/feature-defaults")
 def feature_defaults():
-    """Return the top 5 editable features with medians, min, max + all 753 median defaults."""
+    """Return the top 5 features by SHAP importance with medians, min, max + all 753 median defaults."""
     import json
     defaults_path = STATIC_DIR / "feature_medians.json"
     if not defaults_path.exists():
@@ -289,30 +289,49 @@ def feature_defaults():
     with open(defaults_path) as f:
         data = json.load(f)
 
+    # ── Compute top 5 by SHAP importance (same logic as /top-features) ───────
+    try:
+        import shap as _shap
+        X_all, _ = load_dataset()
+        X_s  = selector.transform(X_all.sample(100, random_state=42))
+        X_sc = scaler.transform(X_s)
+        sv   = _shap.TreeExplainer(model).shap_values(X_sc)
+        if isinstance(sv, list):
+            sv = sv[1]
+        elif hasattr(sv, "ndim") and sv.ndim == 3:
+            sv = sv[:, :, 1]
+        importance  = np.abs(sv).mean(axis=0)
+        top5_idx    = np.argsort(importance)[::-1][:5]
+        top5_names  = [feature_names[i] for i in top5_idx]
+    except Exception:
+        # Fallback to first 5 selected features if SHAP fails
+        top5_names = feature_names[:5]
+    # ─────────────────────────────────────────────────────────────────────────
+
     # Compute min/max from the dataset for the top 5 features
     try:
-        X_all, _ = load_dataset()
-        stats = X_all[feature_names[:5]].agg(["min", "max"]).to_dict()
+        X_all2, _ = load_dataset()
+        stats = X_all2[top5_names].agg(["min", "max"]).to_dict()
     except Exception:
         stats = {}
 
     friendly = {
-        "maxIntensity":       {"label": "Max Intensity (maxIntensity)",          "tooltip": "Maximum vocal intensity (loudness) of the speech signal"},
-        "f2":                 {"label": "Formant F2 Hz (f2)",                    "tooltip": "Second formant frequency — related to tongue position during speech"},
+        "maxIntensity":       {"label": "Max Intensity (maxIntensity)",             "tooltip": "Maximum vocal intensity (loudness) of the speech signal"},
+        "f2":                 {"label": "Formant F2 Hz (f2)",                       "tooltip": "Second formant frequency — related to tongue position during speech"},
         "mean_MFCC_2nd_coef": {"label": "MFCC Coefficient 2 (mean_MFCC_2nd_coef)", "tooltip": "2nd Mel-frequency cepstral coefficient — captures spectral shape of voice"},
         "mean_MFCC_3rd_coef": {"label": "MFCC Coefficient 3 (mean_MFCC_3rd_coef)", "tooltip": "3rd MFCC — reflects fine spectral detail of vocal tract"},
         "mean_MFCC_6th_coef": {"label": "MFCC Coefficient 6 (mean_MFCC_6th_coef)", "tooltip": "6th MFCC — captures higher-order spectral variation in speech"},
     }
 
     top5 = []
-    for name in feature_names[:5]:
+    for name in top5_names:
         if name not in data["medians"]:
             continue
         feat_stats = stats.get(name, {})
         top5.append({
             "name":    name,
-            "label":   friendly.get(name, {}).get("label", name),
-            "tooltip": friendly.get(name, {}).get("tooltip", ""),
+            "label":   friendly.get(name, {}).get("label", f"{name} ({name})"),
+            "tooltip": friendly.get(name, {}).get("tooltip", f"Speech biomarker: {name}"),
             "median":  round(data["medians"][name], 4),
             "min":     round(float(feat_stats.get("min", 0)), 4),
             "max":     round(float(feat_stats.get("max", 0)), 4),
