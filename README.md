@@ -1,72 +1,130 @@
-# Interpretable Machine Learning System for Parkinson's Disease Detection from Speech Biomarkers
+<div align="center">
+
+# 🧠 Interpretable ML System for Parkinson's Disease Detection
+
+### From Speech Biomarkers to Clinical Insights
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/nishnarudkar/Interpretable-Machine-Learning-System-for-Parkinson-s-Disease-Detection-from-Speech-Biomarkers/blob/main/notebooks/Parkinsons_Detection_MLOPS_Project_SMOTE.ipynb)
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.135-green.svg)](https://fastapi.tiangolo.com/)
-[![MLflow](https://img.shields.io/badge/MLflow-3.10-orange.svg)](https://mlflow.org/)
-[![DVC](https://img.shields.io/badge/DVC-3.67-purple.svg)](https://dvc.org/)
+&nbsp;
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.135-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![MLflow](https://img.shields.io/badge/MLflow-3.10-0194E2?logo=mlflow&logoColor=white)](https://mlflow.org/)
+[![DVC](https://img.shields.io/badge/DVC-3.67-945DD6?logo=dvc&logoColor=white)](https://dvc.org/)
+[![XGBoost](https://img.shields.io/badge/XGBoost-3.2-FF6600)](https://xgboost.readthedocs.io/)
+[![SHAP](https://img.shields.io/badge/SHAP-0.51-FF0000)](https://shap.readthedocs.io/)
+
+<br/>
+
+> **A production-grade MLOps pipeline that detects Parkinson's disease from voice recordings using interpretable machine learning, with full experiment tracking, data versioning, and a real-time explainable AI web application.**
+
+</div>
 
 ---
 
-## Authors
+## 👥 Authors
 
-| Name | GitHub |
+<div align="center">
+
+| | Name | GitHub |
+|---|---|---|
+| 🧑‍💻 | Nishant Narudkar | [@nishnarudkar](https://github.com/nishnarudkar) |
+| 🧑‍💻 | Maitreya Pawar | [@Metzo64](https://github.com/Metzo64) |
+| 🧑‍💻 | Vatsal Parmar | [@Vatsal211005](https://github.com/Vatsal211005) |
+| 🧑‍💻 | Aamir Sarang | [@Aamir-Sarang31](https://github.com/Aamir-Sarang31) |
+
+</div>
+
+---
+
+## 📋 Table of Contents
+
+- [Overview](#-overview)
+- [System Architecture](#-system-architecture)
+- [Dataset](#-dataset)
+- [Project Structure](#-project-structure)
+- [ML Pipeline](#-ml-pipeline)
+- [Model Results](#-model-results)
+- [Explainability (SHAP)](#-explainability-shap)
+- [MLOps Stack](#-mlops-stack)
+- [Web Application](#-web-application)
+- [API Reference](#-api-reference)
+- [Installation & Setup](#-installation--setup)
+- [Running the Project](#-running-the-project)
+- [Docker Deployment](#-docker-deployment)
+- [CI/CD with Jenkins](#-cicd-with-jenkins)
+- [Technology Stack](#-technology-stack)
+- [Disclaimer](#-disclaimer)
+
+---
+
+## 🔍 Overview
+
+Parkinson's disease is a progressive neurological disorder whose earliest symptoms often manifest as measurable changes in speech patterns. This project builds a full MLOps system that bridges research and production:
+
+| Capability | Implementation |
 |---|---|
-| Nishant Narudkar | [@nishnarudkar](https://github.com/nishnarudkar) |
-| Maitreya Pawar | [@Metzo64](https://github.com/Metzo64) |
-| Vatsal Parmar | [@Vatsal211005](https://github.com/Vatsal211005) |
-| Aamir Sarang | [@Aamir-Sarang31](https://github.com/Aamir-Sarang31) |
+| Multi-model comparison | 6 classifiers with RandomizedSearchCV tuning |
+| Class imbalance handling | SMOTE inside leakage-free ImbPipeline CV folds |
+| Feature selection | SelectFromModel (Random Forest, top 100 features) |
+| Experiment tracking | MLflow + DagsHub (remote) |
+| Model registry | MLflow Model Registry |
+| Explainability | SHAP TreeExplainer (global + per-prediction) |
+| Serving | FastAPI + dark-themed interactive UI |
+| Data versioning | DVC backed by DagsHub |
+| Containerisation | Docker multi-stage build |
+| CI/CD | Jenkins 6-stage pipeline |
+
+> **Production model:** XGBoost is selected over higher-scoring models (KNN, SVM) because SHAP `TreeExplainer` provides fast, exact feature attribution — critical for a medical application where clinicians need to understand *why* a prediction was made.
 
 ---
 
-## Overview
+## 🏗 System Architecture
 
-Parkinson's disease is a progressive neurological disorder whose earliest symptoms often manifest as measurable changes in speech patterns. This project delivers a production-grade MLOps system that:
-
-- Trains and compares **6 classifiers** on 753 speech biomarker features extracted from voice recordings
-- Handles class imbalance with **SMOTE** applied inside leakage-free `ImbPipeline` CV folds
-- Selects the top 100 features using **SelectFromModel** (Random Forest)
-- Tunes all models with **RandomizedSearchCV** for efficient hyperparameter search
-- Tracks every experiment with **MLflow** synced to **DagsHub**
-- Registers the production model in the **MLflow Model Registry**
-- Generates global and local explanations using **SHAP** (TreeExplainer)
-- Serves predictions through a **FastAPI** web application with a dark-themed interactive UI
-- Versions the dataset with **DVC** backed by DagsHub remote storage
-- Automates the full pipeline with **Jenkins** CI/CD and **Docker** containerisation
-
-> **Note:** XGBoost is selected as the production model for its balance of performance and interpretability. SHAP TreeExplainer provides fast, exact feature attribution — essential for a medical application.
-
----
-
-## Table of Contents
-
-1. [Dataset](#dataset)
-2. [Project Structure](#project-structure)
-3. [ML Pipeline](#ml-pipeline)
-4. [Model Results](#model-results)
-5. [Explainability](#explainability)
-6. [MLOps Stack](#mlops-stack)
-7. [Web Application](#web-application)
-8. [API Reference](#api-reference)
-9. [Installation & Setup](#installation--setup)
-10. [Running the Project](#running-the-project)
-11. [Docker Deployment](#docker-deployment)
-12. [CI/CD with Jenkins](#cicd-with-jenkins)
-13. [Technology Stack](#technology-stack)
-14. [Disclaimer](#disclaimer)
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        DATA LAYER                               │
+│  pd_speech_features.csv  ──►  DVC  ──►  DagsHub Remote         │
+└────────────────────────────────┬────────────────────────────────┘
+                                 │
+┌────────────────────────────────▼────────────────────────────────┐
+│                      TRAINING PIPELINE                          │
+│                                                                 │
+│  Feature Selection          Scaling           SMOTE             │
+│  SelectFromModel(RF)  ──►  StandardScaler  ──►  ImbPipeline     │
+│                                                                 │
+│  6 Models × RandomizedSearchCV × StratifiedKFold(5)            │
+│  LR │ RF │ SVM │ KNN │ DT │ XGBoost                            │
+│                                                                 │
+│  Best Model (XGBoost) ──► MLflow Registry ──► DagsHub          │
+└────────────────────────────────┬────────────────────────────────┘
+                                 │
+┌────────────────────────────────▼────────────────────────────────┐
+│                      EXPLAINABILITY                             │
+│  SHAP TreeExplainer ──► feature_importance.png                  │
+│  Per-prediction SHAP ──► shap_bar.png + top 10 contributions    │
+└────────────────────────────────┬────────────────────────────────┘
+                                 │
+┌────────────────────────────────▼────────────────────────────────┐
+│                      SERVING LAYER                              │
+│  FastAPI  ──►  /predict  ──►  Preprocessing  ──►  XGBoost      │
+│  4-tab UI: Feature Importance │ Learning Curve │ Prediction     │
+│            Model Comparison                                     │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## Dataset
+## 📊 Dataset
 
 | Property | Value |
 |---|---|
 | File | `data/pd_speech_features.csv` |
 | Size | ~5.3 MB (DVC tracked) |
 | Samples | 756 rows |
-| Features | 753 speech biomarkers |
-| Target | Binary (`1` = Parkinson's, `0` = Healthy) |
-| Class ratio | 74.6% Parkinson's / 25.4% Healthy |
+| Raw features | 755 columns (753 features + `id` + `class`) |
+| Selected features | 100 (by Random Forest importance) |
+| Target | Binary — `1` = Parkinson's, `0` = Healthy |
+| Class distribution | 564 Parkinson's (74.6%) / 192 Healthy (25.4%) |
 
 ### Feature Groups
 
@@ -74,118 +132,136 @@ Parkinson's disease is a progressive neurological disorder whose earliest sympto
 |---|---|
 | `PPE`, `DFA`, `RPDE` | Nonlinear dynamical complexity measures |
 | `numPulses`, `numPeriodsPulses` | Glottal pulse counts |
-| `locPctJitter`, `locAbsJitter`, etc. | Jitter (frequency variation) |
-| `localShimmer`, `localdbShimmer`, etc. | Shimmer (amplitude variation) |
+| `locPctJitter`, `locAbsJitter` | Jitter — frequency variation measures |
+| `localShimmer`, `localdbShimmer` | Shimmer — amplitude variation measures |
 | `mean_MFCC_*` | Mel-frequency cepstral coefficients |
-| `tqwt_*` | Tunable Q-factor Wavelet Transform sub-band features |
+| `tqwt_*` | Tunable Q-factor Wavelet Transform sub-band features (36 levels) |
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 .
 ├── api/
-│   └── main.py                     # FastAPI application
+│   └── main.py                      # FastAPI application + all endpoints
 ├── src/
-│   ├── config.py                   # Central path + dataset configuration
-│   ├── train.py                    # Model training + MLflow logging
-│   ├── explain.py                  # SHAP global feature importance
-│   ├── learning_curve.py           # Bias-variance analysis
-│   ├── model_selection.py          # Interpretable model selection logic
-│   └── mlflow_comparison.py        # MLflow metrics fetcher
+│   ├── config.py                    # Central path + dataset configuration
+│   ├── train.py                     # Training pipeline + MLflow logging
+│   ├── explain.py                   # SHAP global feature importance
+│   ├── learning_curve.py            # Bias-variance analysis
+│   ├── model_selection.py           # Interpretable model selection logic
+│   └── mlflow_comparison.py         # MLflow metrics fetcher for UI
 ├── data/
-│   ├── pd_speech_features.csv      # Dataset (DVC tracked)
-│   └── pd_speech_features.csv.dvc  # DVC pointer
-├── models/                         # Trained artifacts (gitignored)
-│   ├── model.pkl
-│   ├── scaler.pkl
-│   ├── selector.pkl
-│   ├── feature_names.pkl
-│   └── column_order.pkl
+│   ├── pd_speech_features.csv       # Dataset (DVC tracked)
+│   └── pd_speech_features.csv.dvc   # DVC pointer file
+├── models/                          # Trained artifacts (gitignored)
+│   ├── model.pkl                    # Production XGBoost model
+│   ├── scaler.pkl                   # Fitted StandardScaler
+│   ├── selector.pkl                 # Fitted SelectFromModel
+│   ├── feature_names.pkl            # 100 selected feature names
+│   └── column_order.pkl             # Training column order (753 features)
 ├── artifacts/
-│   └── model_metrics.json          # Per-run comparison metrics
-├── static/                         # Frontend assets + generated charts
+│   └── model_metrics.json           # Per-run comparison metrics
+├── static/                          # Frontend assets + generated charts
+│   ├── feature_importance.png       # SHAP global chart
+│   ├── learning_curve.png           # Bias-variance plot
+│   ├── feature_medians.json         # Feature defaults for prediction form
+│   └── script.js / style.css        # UI assets
 ├── templates/
-│   └── index.html                  # Jinja2 UI template
+│   └── index.html                   # Jinja2 UI template
 ├── notebooks/
 │   └── Parkinsons_Detection_MLOPS_Project_SMOTE.ipynb
-├── dvc.yaml                        # DVC pipeline
-├── Dockerfile                      # Multi-stage container build
-├── Jenkinsfile                     # CI/CD pipeline
-├── requirements.txt                # Full dependencies (pinned)
-├── requirements-api.txt            # API-only dependencies for Docker
-└── .env.example                    # Credentials template
+├── dvc.yaml                         # DVC pipeline definition
+├── Dockerfile                       # Multi-stage container build
+├── Jenkinsfile                      # 6-stage CI/CD pipeline
+├── requirements.txt                 # Full pinned dependencies
+├── requirements-api.txt             # API-only dependencies (Docker)
+└── .env.example                     # Credentials template
 ```
 
 ---
 
-## ML Pipeline
+## ⚙️ ML Pipeline
 
-### 1. Data Loading
-
-Loaded via `src/config.py` — paths resolve relative to project root (works locally, in Docker, and in CI):
+### Step 1 — Feature Selection
 
 ```python
-X, y = load_dataset()   # 753 features, binary target
+# SMOTE applied first so RF selector learns minority class features
+smote_fs = SMOTE(random_state=42)
+X_train_fs, y_train_fs = smote_fs.fit_resample(X_train, y_train)
+
+selector = SelectFromModel(RandomForestClassifier(n_estimators=100), max_features=100)
+selector.fit(X_train_fs, y_train_fs)   # 753 → 100 features
 ```
 
-### 2. Train/Test Split
+### Step 2 — Scaling
 
-- 80/20 stratified split (`random_state=42`)
-- Train: 604 samples | Test: 152 samples
+`StandardScaler` applied after selection (select → scale). Fitted only on training data to prevent leakage.
 
-### 3. Feature Selection
+### Step 3 — SMOTE inside ImbPipeline
 
-`SelectFromModel(RandomForestClassifier, max_features=100)` — trained on SMOTE-balanced data to learn minority class feature importances, then applied to the original split to avoid leakage.
+```python
+pipeline = ImbPipeline([
+    ("smote", SMOTE(random_state=42)),
+    ("model", SomeClassifier()),
+])
+RandomizedSearchCV(pipeline, param_dist, cv=StratifiedKFold(5), scoring="f1_macro")
+```
 
-### 4. Scaling
+SMOTE is applied **inside each CV fold** — validation folds always contain real, unaugmented data.
 
-`StandardScaler` applied after selection (select → scale order). Fitted only on training data.
+### Step 4 — Model Training
 
-### 5. Class Imbalance
-
-SMOTE applied **inside each model's `ImbPipeline`** during cross-validation — never on the full training set before CV. This ensures validation folds always contain real, unaugmented data.
-
-### 6. Hyperparameter Tuning
-
-All 6 models tuned with `RandomizedSearchCV` + `StratifiedKFold(5)`:
-
-| Model | Input | Iterations |
-|---|---|---|
-| Logistic Regression | Scaled | 20 |
-| Random Forest | Unscaled | 20 |
-| SVM | Scaled | 15 |
-| KNN | Scaled | 15 |
-| Decision Tree | Unscaled | 20 |
-| XGBoost | Unscaled | 30 |
-
----
-
-## Model Results
-
-| Model | Accuracy | Macro F1 | ROC AUC |
+| Model | Data | Search Iterations | Key Params Tuned |
 |---|---|---|---|
-| **XGBoost** ⭐ | **0.89** | **0.855** | **0.946** |
-| SVM | 0.87 | 0.833 | 0.920 |
-| Random Forest | 0.87 | 0.828 | 0.931 |
-| KNN | 0.83 | 0.804 | 0.947 |
-| Logistic Regression | 0.82 | 0.776 | 0.859 |
-| Decision Tree | 0.84 | 0.766 | 0.747 |
-
-All metrics are macro-averaged on the held-out test set. XGBoost is selected as the production model for interpretability, not just raw performance.
+| Logistic Regression | Scaled | 20 | C, solver |
+| Random Forest | Unscaled | 20 | n_estimators, max_depth, max_features |
+| SVM | Scaled | 15 | C, gamma, kernel |
+| KNN | Scaled | 15 | n_neighbors, weights, metric |
+| Decision Tree | Unscaled | 20 | max_depth, criterion, min_samples |
+| XGBoost | Unscaled | 30 | max_depth, gamma, subsample, colsample_bytree |
 
 ---
 
-## Explainability
+## 📈 Model Results
 
-### Global (Feature Importance tab)
+| Model | Accuracy | Macro F1 | ROC AUC | Selected |
+|---|---|---|---|---|
+| **XGBoost** | **0.89** | **0.855** | **0.946** | ✅ Production |
+| SVM | 0.87 | 0.833 | 0.920 | |
+| Random Forest | 0.87 | 0.828 | 0.931 | |
+| KNN | 0.83 | 0.804 | 0.947 | |
+| Logistic Regression | 0.82 | 0.776 | 0.859 | |
+| Decision Tree | 0.84 | 0.766 | 0.747 | |
 
-SHAP `TreeExplainer` computes mean absolute SHAP values across 100 sampled rows. The top 20 most influential speech biomarkers are plotted and saved to `static/feature_importance.png`.
+All metrics are macro-averaged on the held-out test set (152 samples). XGBoost is selected as the production model for interpretability, not just raw performance — SHAP `TreeExplainer` provides fast, exact feature attribution essential for clinical transparency.
 
-### Local (per-prediction)
+### Best XGBoost Configuration
 
-Every prediction returns the top 10 SHAP feature contributions with actual feature names:
+```
+max_depth        : 5       colsample_bytree : 0.8
+min_child_weight : 1       n_estimators     : 300
+gamma            : 0       learning_rate    : 0.05
+subsample        : 0.8
+```
+
+---
+
+## 🔬 Explainability (SHAP)
+
+### Global Feature Importance
+
+- `TreeExplainer` computes mean absolute SHAP values across 100 sampled rows
+- Top 20 most influential speech biomarkers plotted and saved to `static/feature_importance.png`
+- Displayed in the Feature Importance tab
+
+### Per-Prediction Explanation
+
+Every `/predict` call returns:
+- Top 10 SHAP feature contributions with actual feature names
+- A server-generated `shap_bar.png` (dark-themed horizontal bar chart)
+- Color coding: 🔴 red = pushes toward Parkinson's, 🟢 green = pushes toward Healthy
 
 ```json
 {
@@ -194,59 +270,72 @@ Every prediction returns the top 10 SHAP feature contributions with actual featu
 }
 ```
 
-Positive values push toward Parkinson's; negative values push toward Healthy. A server-generated `shap_bar.png` is also produced per prediction.
+### Learning Curve
+
+Full `ImbPipeline` (SMOTE → SelectFromModel → StandardScaler → model) refitted per CV fold — no leakage. Plots train vs. validation macro F1 with ±1 std confidence bands.
 
 ---
 
-## MLOps Stack
+## 🛠 MLOps Stack
 
 ### MLflow + DagsHub
 
-Credentials loaded from environment variables:
-
-```bash
-export DAGSHUB_USERNAME=your_username
-export DAGSHUB_TOKEN=your_token
+```python
+dagshub.init(repo_owner="nishnarudkar", repo_name="...", mlflow=True)
+mlflow.set_experiment("parkinson_detection")
 ```
 
-Each run logs: params, macro_f1, roc_auc, accuracy, precision, recall, and the serialised model. The production XGBoost model is registered in the MLflow Model Registry as `parkinson_detection_model`.
+Each run logs: `accuracy`, `macro_f1`, `roc_auc`, `precision`, `recall`, hyperparameters, and the serialised model. XGBoost is registered atomically:
+
+```python
+mlflow.sklearn.log_model(
+    best_tuned_xgb,
+    name="model",
+    registered_model_name="parkinson_detection_model",
+)
+```
 
 ### DVC Pipeline
 
 ```yaml
 stages:
-  train:       python src/train.py        → models/*.pkl, artifacts/model_metrics.json
-  explain:     python src/explain.py      → static/feature_importance.png
-  learning_curve: python src/learning_curve.py → static/learning_curve.png
+  train:          python src/train.py          → models/*.pkl, artifacts/model_metrics.json
+  explain:        python src/explain.py         → static/feature_importance.png
+  learning_curve: python src/learning_curve.py  → static/learning_curve.png
 ```
 
 Run with: `dvc repro`
 
 ---
 
-## Web Application
+## 🌐 Web Application
 
-Four-tab dark-themed UI:
+Four-tab dark-themed UI served by FastAPI + Jinja2:
 
 | Tab | Content |
 |---|---|
-| Feature Importance | Global SHAP chart + top 5 biomarkers list |
-| Learning Curve | Bias-variance plot with confidence bands |
-| Prediction | 5-input form (top SHAP features) + result + SHAP explanation |
-| Model Comparison | Live leaderboard from MLflow metrics |
+| 📊 Feature Importance | Global SHAP chart + top 5 biomarkers ranked list |
+| 📈 Learning Curve | Bias-variance plot with confidence bands + legend |
+| 🔬 Prediction | 5-input form (top SHAP features) + result card + SHAP explanation |
+| 📋 Model Comparison | Live leaderboard from MLflow metrics |
+
+**UI features:** dark theme, loading spinner, animated probability bar, color-coded results, responsive grid layout, feature range hints, tooltip explanations.
 
 ---
 
-## API Reference
+## 📡 API Reference
 
 ### `GET /health`
 ```json
-{ "status": "ok", "model": "XGBClassifier", "explainer": "TreeExplainer" }
+{ "status": "ok", "model": "XGBClassifier", "explainer": "TreeExplainer", "model_loaded": true }
 ```
 
 ### `POST /predict`
 
-**Request:** `{ "features": [753 floats in training column order] }`
+**Request:**
+```json
+{ "features": [753 floats in training column order] }
+```
 
 **Response:**
 ```json
@@ -262,81 +351,95 @@ Four-tab dark-themed UI:
 ```
 
 ### `GET /feature-defaults`
-Returns top 5 SHAP-ranked features with median, min, max values and all 753 column defaults.
+Returns top 5 SHAP-ranked features with `median`, `min`, `max` values and all 753 column defaults for the prediction form.
 
 ### `GET /model-comparison`
-Returns live model metrics from `artifacts/model_metrics.json` or MLflow.
+Returns live model metrics from `artifacts/model_metrics.json` (or MLflow fallback), sorted by ROC AUC.
 
 ### `GET /top-features`
-Returns top 5 globally important features by SHAP importance.
+Returns top 5 globally important features by mean absolute SHAP value.
 
 ---
 
-## Installation & Setup
+## 🚀 Installation & Setup
 
 ```bash
-# 1. Clone
+# 1. Clone the repository
 git clone https://github.com/nishnarudkar/Interpretable-Machine-Learning-System-for-Parkinson-s-Disease-Detection-from-Speech-Biomarkers.git
 cd Interpretable-Machine-Learning-System-for-Parkinson-s-Disease-Detection-from-Speech-Biomarkers
 
-# 2. Virtual environment
+# 2. Create and activate virtual environment
 python -m venv venv
 venv\Scripts\activate          # Windows
-# source venv/bin/activate     # Linux/macOS
+# source venv/bin/activate     # Linux / macOS
 
 # 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Set credentials
-copy .env.example .env         # then fill in DAGSHUB_USERNAME and DAGSHUB_TOKEN
+# 4. Configure credentials
+copy .env.example .env
+# Edit .env — fill in DAGSHUB_USERNAME and DAGSHUB_TOKEN
 
-# 5. Pull dataset
+# 5. Pull dataset via DVC
 dvc pull
 ```
 
 ---
 
-## Running the Project
+## ▶️ Running the Project
+
+### Option A — Step by step
 
 ```bash
-# Train all models (writes models/, artifacts/, static/feature_medians.json)
-python src/train.py
-
-# Generate SHAP feature importance chart
-python src/explain.py
-
-# Generate learning curve chart
-python src/learning_curve.py
-
-# Start the web app
+python src/train.py          # Train all 6 models, save artifacts
+python src/explain.py        # Generate SHAP feature importance chart
+python src/learning_curve.py # Generate bias-variance learning curve
 uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
 
-Or run the full pipeline in one command:
+### Option B — DVC pipeline (recommended)
 
 ```bash
 dvc repro
 uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
 
-Open `http://localhost:8000`
+Open **http://localhost:8000**
+
+### What each step produces
+
+| Script | Outputs |
+|---|---|
+| `train.py` | `models/*.pkl`, `artifacts/model_metrics.json`, `static/feature_medians.json` |
+| `explain.py` | `static/feature_importance.png` |
+| `learning_curve.py` | `static/learning_curve.png` |
+| `uvicorn` | Live web app at port 8000 |
 
 ---
 
-## Docker Deployment
+## 🐳 Docker Deployment
 
-The Dockerfile uses a multi-stage build — only API dependencies are installed in the runtime image, keeping it lean.
+The Dockerfile uses a **multi-stage build** — only API dependencies are installed in the runtime image, keeping it lean.
 
 ```bash
+# Build
 docker build -t parkinson-ml .
+
+# Run
 docker run -p 8000:8000 parkinson-ml
 ```
 
+Open **http://localhost:8000**
+
 ---
 
-## CI/CD with Jenkins
+## 🔄 CI/CD with Jenkins
 
-The `Jenkinsfile` defines a six-stage automated pipeline:
+The `Jenkinsfile` defines a **6-stage automated pipeline** triggered on every push:
+
+```
+Install Deps → Pull Data (DVC) → Train → Generate Charts → Smoke Test → Build Docker
+```
 
 | Stage | Command |
 |---|---|
@@ -347,18 +450,18 @@ The `Jenkinsfile` defines a six-stage automated pipeline:
 | Smoke Test | `curl -f http://localhost:8000/health` |
 | Build Docker Image | `docker build -t parkinson-ml .` |
 
-Credentials (`DAGSHUB_USERNAME`, `DAGSHUB_TOKEN`) are injected via Jenkins credentials store — never hardcoded.
+Credentials (`DAGSHUB_USERNAME`, `DAGSHUB_TOKEN`) are injected via Jenkins credentials store — never hardcoded in source.
 
 ---
 
-## Technology Stack
+## 🧰 Technology Stack
 
 | Category | Tools |
 |---|---|
 | ML / Data | scikit-learn, XGBoost, pandas, numpy, imbalanced-learn, scipy |
 | Explainability | SHAP (TreeExplainer + KernelExplainer) |
-| Experiment Tracking | MLflow, DagsHub |
-| Data Versioning | DVC |
+| Experiment Tracking | MLflow 3.x, DagsHub |
+| Data Versioning | DVC 3.x |
 | Web Framework | FastAPI, Uvicorn, Jinja2 |
 | Frontend | HTML5, CSS3, JavaScript, Chart.js |
 | Containerisation | Docker (multi-stage) |
@@ -368,6 +471,6 @@ Credentials (`DAGSHUB_USERNAME`, `DAGSHUB_TOKEN`) are injected via Jenkins crede
 
 ---
 
-## Disclaimer
+## ⚠️ Disclaimer
 
 This project is intended for **research and educational purposes only**. It is not a validated medical diagnostic tool. Do not use predictions from this system for clinical decision-making. Always consult a qualified healthcare professional for medical advice.
