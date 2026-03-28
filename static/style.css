@@ -342,6 +342,13 @@ body {
   border-top: 1px solid var(--border);
 }
 
+.footer-disclaimer {
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: #5a6380;
+  letter-spacing: 0.01em;
+}
+
 .shap-img-wrapper {
   margin-top: 20px;
   display: flex;
