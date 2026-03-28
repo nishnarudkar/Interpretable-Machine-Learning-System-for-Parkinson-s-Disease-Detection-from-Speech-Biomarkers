@@ -297,11 +297,11 @@ def feature_defaults():
         stats = {}
 
     friendly = {
-        "maxIntensity":       {"label": "Max Intensity",      "tooltip": "Maximum vocal intensity (loudness) of the speech signal"},
-        "f2":                 {"label": "Formant F2 (Hz)",     "tooltip": "Second formant frequency — related to tongue position during speech"},
-        "mean_MFCC_2nd_coef": {"label": "MFCC Coefficient 2", "tooltip": "2nd Mel-frequency cepstral coefficient — captures spectral shape of voice"},
-        "mean_MFCC_3rd_coef": {"label": "MFCC Coefficient 3", "tooltip": "3rd MFCC — reflects fine spectral detail of vocal tract"},
-        "mean_MFCC_6th_coef": {"label": "MFCC Coefficient 6", "tooltip": "6th MFCC — captures higher-order spectral variation in speech"},
+        "maxIntensity":       {"label": "Max Intensity (maxIntensity)",          "tooltip": "Maximum vocal intensity (loudness) of the speech signal"},
+        "f2":                 {"label": "Formant F2 Hz (f2)",                    "tooltip": "Second formant frequency — related to tongue position during speech"},
+        "mean_MFCC_2nd_coef": {"label": "MFCC Coefficient 2 (mean_MFCC_2nd_coef)", "tooltip": "2nd Mel-frequency cepstral coefficient — captures spectral shape of voice"},
+        "mean_MFCC_3rd_coef": {"label": "MFCC Coefficient 3 (mean_MFCC_3rd_coef)", "tooltip": "3rd MFCC — reflects fine spectral detail of vocal tract"},
+        "mean_MFCC_6th_coef": {"label": "MFCC Coefficient 6 (mean_MFCC_6th_coef)", "tooltip": "6th MFCC — captures higher-order spectral variation in speech"},
     }
 
     top5 = []
