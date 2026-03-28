@@ -20,7 +20,7 @@ pipeline {
           dvc remote modify origin --local auth basic
           dvc remote modify origin --local user %DAGSHUB_USERNAME%
           dvc remote modify origin --local password %DAGSHUB_TOKEN%
-          dvc pull
+          dvc pull --force
         '''
       }
     }
