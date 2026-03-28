@@ -1,5 +1,5 @@
 # ── Stage 1: install dependencies ────────────────────────────────────────────
-FROM python:3.10-slim AS builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
@@ -7,7 +7,7 @@ COPY requirements-api.txt .
 RUN pip install --no-cache-dir --user -r requirements-api.txt
 
 # ── Stage 2: runtime image ────────────────────────────────────────────────────
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
@@ -17,8 +17,10 @@ ENV PATH=/root/.local/bin:$PATH
 
 # Copy only what the API needs at runtime
 COPY api/        api/
-COPY src/config.py   src/config.py
-COPY src/__init__.py src/__init__.py
+COPY src/config.py              src/config.py
+COPY src/__init__.py            src/__init__.py
+COPY src/mlflow_comparison.py   src/mlflow_comparison.py
+COPY src/model_selection.py     src/model_selection.py
 COPY models/     models/
 COPY static/     static/
 COPY templates/  templates/

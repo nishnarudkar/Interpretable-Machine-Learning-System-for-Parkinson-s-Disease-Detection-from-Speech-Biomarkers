@@ -1,5 +1,9 @@
 # Source / training code (not needed at runtime)
 src/
+!src/config.py
+!src/__init__.py
+!src/mlflow_comparison.py
+!src/model_selection.py
 notebooks/
 data/
 mlruns/

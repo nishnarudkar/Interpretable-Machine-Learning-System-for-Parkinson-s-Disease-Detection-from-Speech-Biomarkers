@@ -4,7 +4,7 @@ Interpretable models (XGBoost, Random Forest, Decision Tree) are preferred
 because SHAP TreeExplainer works natively with them — critical for a medical app.
 """
 
-INTERPRETABLE_MODELS = {"XGBoost", "Random Forest", "Decision Tree"}
+INTERPRETABLE_MODELS = {"XGBoost", "XGBoost_tuned", "Random Forest", "RandomForest", "Decision Tree"}
 
 
 def apply_selection_flags(rows: list) -> None:
