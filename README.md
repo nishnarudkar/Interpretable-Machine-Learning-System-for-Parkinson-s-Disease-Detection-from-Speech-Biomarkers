@@ -41,6 +41,15 @@ Parkinson's disease is a progressive neurological disorder. One of its earliest 
 - Versions the dataset with **DVC** backed by DagsHub remote storage
 - Automates training and deployment via **Jenkins** and **Docker**
 
+### Architecture Diagram (GitHub → Jenkins → MLflow/DagsHub → Render)
+
+This system is built with a production-ready MLOps architecture designed for reliable iteration and deployment:
+
+1. **GitHub (Source Control)**: All application code, configuration `Jenkinsfile`/`Dockerfile`, and DVC pointer files are tracked and versioned here.
+2. **Jenkins (Continuous Integration)**: Configured using Windows `bat` commands, Jenkins monitors GitHub for changes. On execution, it orchestrates the pipeline: spinning up the environment, installing dependencies, dynamically pulling raw data via DVC, successfully running the models, applying explainability logic, and ensuring a successful `FastAPI` health check. 
+3. **MLflow / DagsHub (Experiment Tracking)**: During Jenkins execution, all model training phases communicate with DagsHub via MLflow to log evaluation metrics (e.g., ROC AUC, Precision, F1-Score). Best performing candidate artifacts (like the XGBoost model and SMOTE configurations) are tracked securely in the model registry.
+4. **Render (Continuous Deployment)**: Bypassing Jenkins for simple deployment hosting, Render ties straight into the GitHub repo. Upon code and artifact updates to the `main` branch, Render automatically rebuilds the `FastAPI` Docker image and serves the web application live to users.
+
 ---
 
 ## Dataset
@@ -497,11 +506,20 @@ The `Jenkinsfile` defines a five-stage pipeline:
 | Install Dependencies | `pip install -r requirements.txt` |
 | Pull Data (DVC) | `dvc pull` |
 | Train Model | `python src/train.py` |
-| Generate Explanations | `python src/explain.py && python src/learning_curve.py` |
-| Smoke Test | `curl -f http://localhost:8000/health` |
-| Build Docker Image | `docker build -t parkinson-ml .` |
+| Generate Explanations | `bat 'python src/explain.py && python src/learning_curve.py'` |
+| Smoke Test | `bat 'start /b uvicorn ... '` |
+| Build Docker Image | `bat 'docker build -t parkinson-api .'` |
 
-Credentials (`DAGSHUB_USERNAME`, `DAGSHUB_TOKEN`) are injected via Jenkins credentials store — never hardcoded.
+Credentials (`DAGSHUB_USERNAME`, `DAGSHUB_TOKEN`) are injected via Jenkins credentials store — never hardcoded. *Note: The pipeline uses Windows `bat` commands to run identically on local Windows installations of Jenkins.*
+
+---
+
+## Render Deployment
+
+This project natively supports Render for easy, automated UI deployment.
+1. Connect your GitHub repository to a new Render "Web Service".
+2. Select **Docker** as the Runtime.
+3. Render will automatically detect the `Dockerfile`, install the API dependencies with `uvicorn`, and run the interface on Port 8000 when deployed. Every subsequent push to `main` instantly triggers a redeployment.
 
 ---
 

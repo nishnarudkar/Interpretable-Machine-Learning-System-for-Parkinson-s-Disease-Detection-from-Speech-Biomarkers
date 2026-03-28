@@ -10,16 +10,16 @@ pipeline {
 
     stage('Install Dependencies') {
       steps {
-        sh 'pip install -r requirements.txt'
+        bat 'pip install -r requirements.txt'
       }
     }
 
     stage('Pull Data (DVC)') {
       steps {
-        sh '''
+        bat '''
           dvc remote modify origin --local auth basic
-          dvc remote modify origin --local user $DAGSHUB_USERNAME
-          dvc remote modify origin --local password $DAGSHUB_TOKEN
+          dvc remote modify origin --local user %DAGSHUB_USERNAME%
+          dvc remote modify origin --local password %DAGSHUB_TOKEN%
           dvc pull
         '''
       }
@@ -27,31 +27,31 @@ pipeline {
 
     stage('Train Model') {
       steps {
-        sh 'python src/train.py'
+        bat 'python src/train.py'
       }
     }
 
     stage('Generate Explanations') {
       steps {
-        sh 'python src/explain.py'
-        sh 'python src/learning_curve.py'
+        bat 'python src/explain.py'
+        bat 'python src/learning_curve.py'
       }
     }
 
     stage('Smoke Test') {
       steps {
-        sh '''
-          uvicorn api.main:app --host 0.0.0.0 --port 8000 &
-          sleep 5
+        bat '''
+          start /b uvicorn api.main:app --host 0.0.0.0 --port 8000
+          timeout /t 5 /nobreak
           curl -f http://localhost:8000/health
-          kill %1
+          taskkill /F /IM uvicorn.exe || exit 0
         '''
       }
     }
 
     stage('Build Docker Image') {
       steps {
-        sh 'docker build -t parkinson-ml .'
+        bat 'docker build -t parkinson-api .'
       }
     }
 
@@ -59,7 +59,7 @@ pipeline {
 
   post {
     always {
-      sh 'pkill -f uvicorn || true'
+      bat 'taskkill /F /IM uvicorn.exe || exit 0'
     }
   }
 }
