@@ -43,7 +43,7 @@ pipeline {
       steps {
         bat '''
           start /b uvicorn api.main:app --host 0.0.0.0 --port 8000
-          timeout /t 5 /nobreak
+          powershell -Command "Start-Sleep -Seconds 10"
           curl -f http://localhost:8000/health
           taskkill /F /IM uvicorn.exe || exit 0
         '''
