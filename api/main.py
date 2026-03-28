@@ -2,10 +2,12 @@ from fastapi import FastAPI, Request, HTTPException, Body
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from typing import Any, Dict
+from pydantic import BaseModel, Field
+from typing import Annotated, Any, Dict, List
 import json
 import joblib
 import numpy as np
+import pandas as pd
 import shap
 import sys
 import logging
@@ -35,6 +37,18 @@ TREE_MODELS = (RandomForestClassifier, GradientBoostingClassifier,
 app = FastAPI(title="Parkinson Detection API", version="1.0.0")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+
+class FeatureInput(BaseModel):
+    """Exactly EXPECTED_RAW_FEATURES float values in training column order."""
+    features: Annotated[
+        List[float],
+        Field(
+            min_length=EXPECTED_RAW_FEATURES,
+            max_length=EXPECTED_RAW_FEATURES,
+            description=f"Exactly {EXPECTED_RAW_FEATURES} numeric speech feature values",
+        ),
+    ]
 
 
 # ── SHAP normalisation ────────────────────────────────────────────────────────
