@@ -4,6 +4,7 @@ pipeline {
   environment {
     DAGSHUB_USERNAME = credentials('dagshub-username')
     DAGSHUB_TOKEN    = credentials('dagshub-token')
+    PYTHONIOENCODING = 'utf-8'
   }
 
   stages {
