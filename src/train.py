@@ -30,6 +30,7 @@ DAGSHUB_TRACKING_URI = (
 os.environ["MLFLOW_TRACKING_URI"]      = DAGSHUB_TRACKING_URI
 os.environ["MLFLOW_TRACKING_USERNAME"] = os.getenv("DAGSHUB_USERNAME", "nishnarudkar")
 os.environ["MLFLOW_TRACKING_PASSWORD"] = os.getenv("DAGSHUB_TOKEN", "")
+os.environ["DAGSHUB_USER_TOKEN"]       = os.getenv("DAGSHUB_TOKEN", "")
 # ──────────────────────────────────────────────────────────────────────────────
 
 import pandas as pd
