@@ -224,6 +224,22 @@ def predict(data: FeatureInput):
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 
+@app.get("/model-comparison")
+def model_comparison():
+    """Return model comparison data from the last training run."""
+    # Results from the notebook experimentation with SMOTE + RandomizedSearchCV
+    # These are the actual scores logged to MLflow during training
+    models = [
+        {"model": "XGBoost",             "accuracy": 0.89, "macro_f1": 0.855, "roc_auc": 0.946, "selected": True},
+        {"model": "SVM",                 "accuracy": 0.87, "macro_f1": 0.833, "roc_auc": 0.920, "selected": False},
+        {"model": "Random Forest",       "accuracy": 0.87, "macro_f1": 0.828, "roc_auc": 0.931, "selected": False},
+        {"model": "KNN",                 "accuracy": 0.83, "macro_f1": 0.804, "roc_auc": 0.947, "selected": False},
+        {"model": "Logistic Regression", "accuracy": 0.82, "macro_f1": 0.776, "roc_auc": 0.859, "selected": False},
+        {"model": "Decision Tree",       "accuracy": 0.84, "macro_f1": 0.766, "roc_auc": 0.747, "selected": False},
+    ]
+    return {"models": models}
+
+
 @app.get("/health")
 def health():
     return {

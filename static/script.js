@@ -5,6 +5,7 @@ function openTab(tab, btn) {
   document.getElementById(tab).classList.add("active");
   if (btn) btn.classList.add("active");
   if (tab === "importance") loadTopFeatures();
+  if (tab === "comparison") loadModelComparison();
 }
 
 // ── Top features list ──
@@ -113,7 +114,27 @@ function renderShapImage(url) {
   wrapper.classList.remove("hidden");
 }
 
-// ── Top influencing features list (from per-prediction SHAP) ──
+// ── Model comparison table ──
+async function loadModelComparison() {
+  const tbody = document.getElementById("comparison-tbody");
+  if (!tbody || tbody.dataset.loaded) return;
+  try {
+    const res  = await fetch("/model-comparison");
+    const data = await res.json();
+    tbody.innerHTML = data.models.map(m => {
+      const selected = m.selected || m.model === "XGBoost";
+      return `
+      <tr class="${selected ? "row-selected" : ""}">
+        <td>${selected ? "⭐ " : ""}${m.model}</td>
+        <td>${m.roc_auc.toFixed(3)}</td>
+        <td>${m.macro_f1.toFixed(3)}</td>
+      </tr>`;
+    }).join("");
+    tbody.dataset.loaded = "1";
+  } catch {
+    tbody.innerHTML = "<tr><td colspan='3'>Could not load data.</td></tr>";
+  }
+}
 function renderTopInfluencing(contributions) {
   const section = document.getElementById("top-influencing");
   const list    = document.getElementById("top-influencing-list");
