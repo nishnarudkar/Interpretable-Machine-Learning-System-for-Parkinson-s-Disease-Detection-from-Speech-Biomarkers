@@ -6,12 +6,6 @@
   <title>Parkinson Detection System</title>
   <link rel="stylesheet" href="/static/style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script>
-    // Prevent Flash of Unstyled Content (FOUC)
-    if (localStorage.getItem("theme") === "light") {
-      document.documentElement.classList.add("light-mode");
-    }
-  </script>
 </head>
 <body>
 
@@ -26,9 +20,6 @@
         </div>
       </div>
       <div class="header-right" style="display: flex; align-items: center; gap: 15px;">
-        <button id="theme-toggle" class="theme-toggle" aria-label="Toggle Dark/Light Mode">
-          <span class="icon">☀️</span>
-        </button>
         <div class="badge">XAI · MLflow · SHAP</div>
       </div>
     </div>
