@@ -47,6 +47,9 @@
     <button class="tab-btn" onclick="openTab('comparison', this)">
       <span>📋</span> Model Comparison
     </button>
+    <button class="tab-btn" onclick="openTab('insights', this)">
+      <span>🔎</span> Feature Insights
+    </button>
   </nav>
 
   <main class="main">
@@ -174,6 +177,19 @@
             <p>Therefore, XGBoost is used for prediction and explainability in this system.</p>
           </div>
         </aside>
+      </div>
+    </div>
+
+    <!-- Feature Insights Tab -->
+    <div id="insights" class="tabcontent">
+      <div class="card">
+        <div class="card-header">
+          <h2>Feature Insights — Biomarker Analysis</h2>
+          <p>How the most discriminative speech biomarkers differ between Parkinson's and Healthy patients (standardised values from the training dataset).</p>
+        </div>
+        <div id="insights-grid" class="insights-grid">
+          <div class="insights-loading">Loading biomarker analysis...</div>
+        </div>
       </div>
     </div>
 

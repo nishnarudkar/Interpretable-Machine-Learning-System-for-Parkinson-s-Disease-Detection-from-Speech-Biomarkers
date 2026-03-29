@@ -1,0 +1,42 @@
+[
+  {
+    "feature": "mean_MFCC_2nd_coef",
+    "label": "MFCC Coefficient 2",
+    "parkinson": 0.2379,
+    "healthy": -0.6686,
+    "trend": "Higher in Parkinson",
+    "reason": "The 2nd Mel-frequency cepstral coefficient captures the overall spectral shape of the voice. Parkinson's patients show elevated values, reflecting changes in vocal tract resonance caused by muscle rigidity and reduced breath support."
+  },
+  {
+    "feature": "tqwt_maxValue_dec_12",
+    "label": "Max Wavelet Energy (Level 12)",
+    "parkinson": -0.2432,
+    "healthy": 0.6407,
+    "trend": "Lower in Parkinson",
+    "reason": "Peak energy in the 12th wavelet decomposition level is reduced in Parkinson's patients. This reflects weakened vocal fold vibration and reduced phonation strength, common early symptoms of the disease."
+  },
+  {
+    "feature": "std_8th_delta_delta",
+    "label": "Acceleration Variability (8th MFCC)",
+    "parkinson": 0.2481,
+    "healthy": -0.6038,
+    "trend": "Higher in Parkinson",
+    "reason": "The second-order rate of change (delta-delta) of the 8th MFCC measures how rapidly the spectral dynamics accelerate. Higher variability in Parkinson's patients indicates unstable, tremor-driven fluctuations in speech production."
+  },
+  {
+    "feature": "std_9th_delta_delta",
+    "label": "Acceleration Variability (9th MFCC)",
+    "parkinson": 0.2371,
+    "healthy": -0.6006,
+    "trend": "Higher in Parkinson",
+    "reason": "Similar to the 8th coefficient, elevated delta-delta variability in the 9th MFCC reflects neuromotor instability. Parkinson's patients exhibit greater speech acceleration irregularities due to impaired motor control."
+  },
+  {
+    "feature": "tqwt_minValue_dec_13",
+    "label": "Min Wavelet Energy (Level 13)",
+    "parkinson": 0.2372,
+    "healthy": -0.5877,
+    "trend": "Higher in Parkinson",
+    "reason": "The minimum energy in the 13th wavelet sub-band is paradoxically higher in Parkinson's patients. This suggests irregular energy distribution across the speech signal, consistent with dysphonia and vocal tremor."
+  }
+]

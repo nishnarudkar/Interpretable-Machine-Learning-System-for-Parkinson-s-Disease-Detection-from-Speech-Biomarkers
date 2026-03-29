@@ -7,6 +7,7 @@ function openTab(tab, btn) {
   if (tab === "importance") loadTopFeatures();
   if (tab === "comparison") loadModelComparison();
   if (tab === "prediction") loadPredictionFields();
+  if (tab === "insights")   loadInsights();
 }
 
 /** Top-5 feature names and defaults from /feature-config (filled after first fetch). */
@@ -177,6 +178,49 @@ function renderShapImage(url) {
   const img     = document.getElementById("shap-bar-img");
   img.src = url + "?t=" + Date.now();
   wrapper.classList.remove("hidden");
+}
+
+// ── Feature Insights ──
+async function loadInsights() {
+  const grid = document.getElementById("insights-grid");
+  if (!grid || grid.dataset.loaded) return;
+  try {
+    const res  = await fetch("/static/feature_insights.json");
+    const data = await res.json();
+
+    grid.innerHTML = data.map(f => {
+      const higher = f.trend === "Higher in Parkinson";
+      const trendClass = higher ? "trend-high" : "trend-low";
+      const trendIcon  = higher ? "▲" : "▼";
+      const diff = Math.abs(f.parkinson - f.healthy).toFixed(4);
+
+      return `
+        <div class="insight-card">
+          <div class="insight-header">
+            <span class="insight-name">${escapeHtml(f.label || f.feature)}</span>
+            <span class="insight-trend ${trendClass}">${trendIcon} ${escapeHtml(f.trend)}</span>
+          </div>
+          <div class="insight-feature-id">${escapeHtml(f.feature)}</div>
+          <div class="insight-means">
+            <div class="insight-mean parkinson-mean">
+              <span class="mean-label">Parkinson's</span>
+              <span class="mean-value">${f.parkinson.toFixed(4)}</span>
+            </div>
+            <div class="insight-diff">Δ ${diff}</div>
+            <div class="insight-mean healthy-mean">
+              <span class="mean-label">Healthy</span>
+              <span class="mean-value">${f.healthy.toFixed(4)}</span>
+            </div>
+          </div>
+          <p class="insight-reason">${escapeHtml(f.reason)}</p>
+        </div>`;
+    }).join("");
+
+    grid.dataset.loaded = "1";
+  } catch (e) {
+    grid.innerHTML = "<p class='insights-loading'>Could not load feature insights.</p>";
+    console.error(e);
+  }
 }
 
 // ── Model comparison (from GET /model-comparison) ──
