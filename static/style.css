@@ -764,6 +764,55 @@ body {
   letter-spacing: 0.02em;
 }
 
+.wavelet-insight {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: rgba(59, 130, 246, 0.08);
+  border-left: 4px solid #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+  padding: 18px 22px;
+  margin: 28px auto 0;
+  border-radius: 8px;
+  font-size: 0.98rem;
+  color: #f1f5f9;
+  line-height: 1.6;
+  max-width: 800px;
+}
+
+.wavelet-insight-icon {
+  font-size: 1.25rem;
+  line-height: 1.2;
+}
+
+.wavelet-insight-content {
+  flex: 1;
+}
+
+.wavelet-insight strong {
+  color: #93c5fd;
+}
+
+.wavelet-insight + .unifying-insight {
+  margin-top: 16px;
+}
+
+.unifying-insight {
+  background: rgba(108, 99, 255, 0.08);
+  border-left: 4px solid var(--accent);
+  padding: 18px 22px;
+  margin: 28px auto 0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: var(--text);
+  line-height: 1.6;
+  max-width: 800px;
+}
+
+.unifying-insight strong {
+  color: var(--accent2);
+}
+
 .insights-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));

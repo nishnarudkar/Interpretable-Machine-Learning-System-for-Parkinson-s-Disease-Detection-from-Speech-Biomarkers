@@ -13,7 +13,7 @@
     "parkinson": -0.2432,
     "healthy": 0.6407,
     "trend": "Lower in Parkinson",
-    "reason": "Peak energy in the 12th wavelet decomposition level is reduced in Parkinson's patients. This reflects weakened vocal fold vibration and reduced phonation strength, common early symptoms of the disease."
+    "reason": "Reduced peak energy at this level indicates weakened and less stable vocal fold vibrations, reflecting loss of strong, structured speech components in Parkinson’s patients."
   },
   {
     "feature": "std_8th_delta_delta",
@@ -37,6 +37,6 @@
     "parkinson": 0.2372,
     "healthy": -0.5877,
     "trend": "Higher in Parkinson",
-    "reason": "The minimum energy in the 13th wavelet sub-band is paradoxically higher in Parkinson's patients. This suggests irregular energy distribution across the speech signal, consistent with dysphonia and vocal tremor."
+    "reason": "Increased minimum energy reflects elevated background fluctuations and irregular energy distribution, indicating vocal instability and tremor-related noise in Parkinson’s speech."
   }
 ]

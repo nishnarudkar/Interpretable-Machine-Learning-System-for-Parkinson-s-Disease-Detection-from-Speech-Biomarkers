@@ -186,13 +186,25 @@
     <div id="insights" class="tabcontent">
       <div class="card">
         <div class="card-header">
-          <h2>Feature Insights — Biomarker Analysis</h2>
+          <h2>
+            Feature Insights — Biomarker Analysis
+            <span class="feat-tooltip-icon" title="Note: Wavelet decomposition levels correspond to different frequency bands, so features from Level 12 and Level 13 reflect behavior in different parts of the speech spectrum and are not directly comparable in magnitude.">ℹ</span>
+          </h2>
           <p class="insights-summary-highlight">Key speech biomarkers show increased variability and irregular energy patterns in Parkinson’s patients, indicating vocal instability and neuromotor impairment.</p>
         </div>
         <div id="insights-grid" class="insights-grid">
           <div class="insights-loading">Loading biomarker analysis...</div>
         </div>
-        <div class="insights-footer-note">Note: Values are standardized and derived from the training dataset.</div>
+        <div class="wavelet-insight">
+          <div class="wavelet-insight-icon">ℹ️</div>
+          <div class="wavelet-insight-content">
+            <strong>Note:</strong> Wavelet decomposition levels correspond to different frequency bands, so features from Level 12 and Level 13 reflect behavior in different parts of the speech spectrum and are not directly comparable in magnitude.
+          </div>
+        </div>
+        <div class="unifying-insight">
+          <p><strong>Clinical Note:</strong> These opposing trends indicate a redistribution of spectral energy — from strong, stable peaks to irregular, noise-like fluctuations — a hallmark of Parkinsonian speech.</p>
+        </div>
+        <div class="insights-footer-note" style="margin-top: 24px;">Note: Values are standardized and derived from the training dataset.</div>
       </div>
     </div>
 
