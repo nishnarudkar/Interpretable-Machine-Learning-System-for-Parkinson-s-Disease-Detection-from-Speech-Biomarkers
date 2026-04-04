@@ -279,6 +279,10 @@
         </div>
 
         <div id="drift-error" class="drift-error hidden"></div>
+
+        <div class="unifying-insight" style="margin-top:24px;">
+          <p><strong>How drift monitoring works:</strong> Every prediction you run is logged to <code class="inline-code">monitoring/current_data.csv</code>. Running <code class="inline-code">python monitoring/drift_check.py</code> compares that data against the training baseline using the Kolmogorov-Smirnov test. A p-value below 0.05 per feature indicates drift. If more than 50% of features drift, retraining is recommended.</p>
+        </div>
       </div>
     </div>
 
