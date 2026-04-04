@@ -166,6 +166,8 @@ def predict(data: FeatureInput):
         arr_scaled   = scaler.transform(arr_selected) # standardise
 
         # ── Log input to monitoring/current_data.csv ──────────────────────────
+        # Log UNSCALED selected features (same scale as baseline_data.csv)
+        # baseline_data.csv = X_train_sel (unscaled), so we log arr_selected (unscaled)
         try:
             _monitoring_csv = Path(__file__).resolve().parent.parent / "monitoring" / "current_data.csv"
             _log_df = pd.DataFrame(arr_selected, columns=feature_names)
