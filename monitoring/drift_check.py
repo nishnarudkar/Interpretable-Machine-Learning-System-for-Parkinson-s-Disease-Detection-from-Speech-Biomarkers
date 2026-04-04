@@ -80,11 +80,11 @@ def run_drift_report(reference: pd.DataFrame, current: pd.DataFrame) -> None:
     print("[INFO]  Running Evidently DataDriftPreset...")
 
     report = Report(metrics=[DataDriftPreset()])
-    # Evidently 0.7+: current_data is first positional arg, reference_data is second
-    report.run(current_data=current, reference_data=reference)
+    # Evidently 0.7+: run() returns a Snapshot — save_html is on the snapshot
+    snapshot = report.run(current_data=current, reference_data=reference)
 
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    report.save_html(str(REPORT_PATH))
+    snapshot.save_html(str(REPORT_PATH))
 
     print(f"[OK]    Drift report saved → {REPORT_PATH}")
 
