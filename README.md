@@ -12,10 +12,13 @@
 [![DVC](https://img.shields.io/badge/DVC-3.67-945DD6?logo=dvc&logoColor=white)](https://dvc.org/)
 [![XGBoost](https://img.shields.io/badge/XGBoost-3.2-FF6600)](https://xgboost.readthedocs.io/)
 [![SHAP](https://img.shields.io/badge/SHAP-0.51-FF0000)](https://shap.readthedocs.io/)
+[![Evidently](https://img.shields.io/badge/Evidently-0.7-blueviolet)](https://www.evidentlyai.com/)
+[![Docker](https://img.shields.io/badge/Docker-multi--stage-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Jenkins](https://img.shields.io/badge/Jenkins-CI%2FCD-D24939?logo=jenkins&logoColor=white)](https://www.jenkins.io/)
 
 <br/>
 
-> **A production-grade MLOps pipeline that detects Parkinson's disease from voice recordings using interpretable machine learning, with full experiment tracking, data versioning, and a real-time explainable AI web application.**
+> **A production-grade MLOps pipeline that detects Parkinson's disease from voice recordings using interpretable machine learning — with full experiment tracking, data versioning, real-time SHAP explanations, and live data drift monitoring.**
 
 </div>
 
@@ -40,6 +43,7 @@
 
 - [Overview](#-overview)
 - [System Architecture](#-system-architecture)
+- [Full Pipeline Flow](#-full-pipeline-flow)
 - [Dataset](#-dataset)
 - [Project Structure](#-project-structure)
 - [ML Pipeline](#-ml-pipeline)
@@ -47,6 +51,7 @@
 - [Explainability (SHAP)](#-explainability-shap)
 - [MLOps Stack](#-mlops-stack)
 - [Web Application](#-web-application)
+- [Drift Monitoring](#-drift-monitoring)
 - [API Reference](#-api-reference)
 - [Installation & Setup](#-installation--setup)
 - [Running the Project](#-running-the-project)
@@ -69,10 +74,11 @@ Parkinson's disease is a progressive neurological disorder whose earliest sympto
 | Experiment tracking | MLflow + DagsHub (remote) |
 | Model registry | MLflow Model Registry |
 | Explainability | SHAP TreeExplainer (global + per-prediction) |
-| Serving | FastAPI + dark-themed interactive UI |
+| Serving | FastAPI + dark-themed 6-tab interactive UI |
 | Data versioning | DVC backed by DagsHub |
+| Drift monitoring | Evidently AI + native Drift Monitor UI tab |
 | Containerisation | Docker multi-stage build |
-| CI/CD | Jenkins 6-stage pipeline |
+| CI/CD | Jenkins 7-stage pipeline |
 
 > **Production model:** XGBoost is selected over higher-scoring models (KNN, SVM) because SHAP `TreeExplainer` provides fast, exact feature attribution — critical for a medical application where clinicians need to understand *why* a prediction was made.
 
@@ -81,35 +87,97 @@ Parkinson's disease is a progressive neurological disorder whose earliest sympto
 ## 🏗 System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        DATA LAYER                               │
-│  pd_speech_features.csv  ──►  DVC  ──►  DagsHub Remote         │
-└────────────────────────────────┬────────────────────────────────┘
-                                 │
-┌────────────────────────────────▼────────────────────────────────┐
-│                      TRAINING PIPELINE                          │
-│                                                                 │
-│  Feature Selection          Scaling           SMOTE             │
-│  SelectFromModel(RF)  ──►  StandardScaler  ──►  ImbPipeline     │
-│                                                                 │
-│  6 Models × RandomizedSearchCV × StratifiedKFold(5)            │
-│  LR │ RF │ SVM │ KNN │ DT │ XGBoost                            │
-│                                                                 │
-│  Best Model (XGBoost) ──► MLflow Registry ──► DagsHub          │
-└────────────────────────────────┬────────────────────────────────┘
-                                 │
-┌────────────────────────────────▼────────────────────────────────┐
-│                      EXPLAINABILITY                             │
-│  SHAP TreeExplainer ──► feature_importance.png                  │
-│  Per-prediction SHAP ──► shap_bar.png + top 10 contributions    │
-└────────────────────────────────┬────────────────────────────────┘
-                                 │
-┌────────────────────────────────▼────────────────────────────────┐
-│                      SERVING LAYER                              │
-│  FastAPI  ──►  /predict  ──►  Preprocessing  ──►  XGBoost      │
-│  4-tab UI: Feature Importance │ Learning Curve │ Prediction     │
-│            Model Comparison                                     │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                         DATA LAYER                               │
+│   pd_speech_features.csv  ──►  DVC  ──►  DagsHub Remote         │
+└─────────────────────────────────┬────────────────────────────────┘
+                                  │
+┌─────────────────────────────────▼────────────────────────────────┐
+│                      TRAINING PIPELINE                           │
+│                                                                  │
+│   Feature Selection           Scaling            SMOTE           │
+│   SelectFromModel(RF) ──►  StandardScaler  ──►  ImbPipeline      │
+│   753 → 100 features                                             │
+│                                                                  │
+│   6 Models × RandomizedSearchCV × StratifiedKFold(5)            │
+│   LR  │  RF  │  SVM  │  KNN  │  DT  │  XGBoost                  │
+│                                                                  │
+│   XGBoost ──► MLflow Registry ──► DagsHub                       │
+│   Baseline saved ──► monitoring/baseline_data.csv               │
+└─────────────────────────────────┬────────────────────────────────┘
+                                  │
+┌─────────────────────────────────▼────────────────────────────────┐
+│                      EXPLAINABILITY                              │
+│   SHAP TreeExplainer ──► feature_importance.png                  │
+│   Per-prediction SHAP ──► shap_bar.png + top 10 contributions    │
+│   Learning Curve ──► learning_curve.png                          │
+└─────────────────────────────────┬────────────────────────────────┘
+                                  │
+┌─────────────────────────────────▼────────────────────────────────┐
+│                       SERVING LAYER                              │
+│   FastAPI  ──►  /predict  ──►  select → scale → XGBoost         │
+│   6-tab UI: Feature Importance │ Learning Curve │ Prediction     │
+│             Model Comparison   │ Feature Insights │ Drift Monitor│
+└─────────────────────────────────┬────────────────────────────────┘
+                                  │
+┌─────────────────────────────────▼────────────────────────────────┐
+│                     MONITORING LAYER                             │
+│   /predict logs ──► current_data.csv                            │
+│   drift_check.py ──► Evidently KS test ──► drift_report.html    │
+│   /drift-status ──► Drift Monitor tab (live dashboard)          │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔄 Full Pipeline Flow
+
+```mermaid
+flowchart TD
+    A([🗄️ Raw Dataset\npd_speech_features.csv]) --> B[DVC Pull\nfrom DagsHub]
+    B --> C[load_dataset\n756 rows × 753 features]
+
+    C --> D[train_test_split\n80/20 stratified]
+    D --> E[SMOTE on X_train\nfor selector only]
+    E --> F[SelectFromModel RF\n753 → 100 features]
+    F --> G[StandardScaler\nfit on X_train_sel]
+
+    G --> H{6 Models\nRandomizedSearchCV\n+ ImbPipeline}
+    H --> H1[Logistic Regression]
+    H --> H2[Random Forest]
+    H --> H3[SVM]
+    H --> H4[KNN]
+    H --> H5[Decision Tree]
+    H --> H6[XGBoost ✅]
+
+    H1 & H2 & H3 & H4 & H5 & H6 --> I[MLflow\nLog all runs\nto DagsHub]
+    H6 --> J[Save Production\nArtifacts\nmodels/*.pkl]
+    J --> K[baseline_data.csv\nmonitoring baseline]
+
+    J --> L[src/explain.py\nSHAP TreeExplainer]
+    J --> M[src/learning_curve.py\nBias-Variance Plot]
+    L --> N[feature_importance.png]
+    M --> O[learning_curve.png]
+
+    J --> P[FastAPI\napi/main.py]
+    N --> P
+    O --> P
+    I --> P
+
+    P --> Q[6-Tab Dark UI\nlocalhost:8000]
+    Q --> R[📊 Feature Importance]
+    Q --> S[📈 Learning Curve]
+    Q --> T[🔬 Prediction]
+    Q --> U[📋 Model Comparison]
+    Q --> V[🔎 Feature Insights]
+    Q --> W[📡 Drift Monitor]
+
+    T -->|POST /predict| X[select → scale → XGBoost\n+ SHAP explanation]
+    X -->|append| Y[current_data.csv]
+    Y --> Z[drift_check.py\nEvidently KS Test]
+    K --> Z
+    Z --> AA[drift_report.html\ndrift_summary.txt\ndrift_feature_details.csv]
+    AA -->|GET /drift-status| W
 ```
 
 ---
@@ -121,7 +189,7 @@ Parkinson's disease is a progressive neurological disorder whose earliest sympto
 | File | `data/pd_speech_features.csv` |
 | Size | ~5.3 MB (DVC tracked) |
 | Samples | 756 rows |
-| Raw features | 755 columns (753 features + `id` + `class`) |
+| Raw columns | 755 (`id` + `class` + 753 features) |
 | Selected features | 100 (by Random Forest importance) |
 | Target | Binary — `1` = Parkinson's, `0` = Healthy |
 | Class distribution | 564 Parkinson's (74.6%) / 192 Healthy (25.4%) |
@@ -134,8 +202,9 @@ Parkinson's disease is a progressive neurological disorder whose earliest sympto
 | `numPulses`, `numPeriodsPulses` | Glottal pulse counts |
 | `locPctJitter`, `locAbsJitter` | Jitter — frequency variation measures |
 | `localShimmer`, `localdbShimmer` | Shimmer — amplitude variation measures |
-| `mean_MFCC_*` | Mel-frequency cepstral coefficients |
-| `tqwt_*` | Tunable Q-factor Wavelet Transform sub-band features (36 levels) |
+| `mean_MFCC_*` | Mel-frequency cepstral coefficients (0–12) |
+| `tqwt_TKEO_*`, `tqwt_entropy_*` | Tunable Q-factor Wavelet Transform features (36 levels) |
+| `f1`–`f4`, `b1`–`b4` | Formant frequencies and bandwidths |
 
 ---
 
@@ -144,37 +213,49 @@ Parkinson's disease is a progressive neurological disorder whose earliest sympto
 ```
 .
 ├── api/
-│   └── main.py                      # FastAPI application + all endpoints
+│   └── main.py                      # FastAPI app — all endpoints, SHAP inference, drift API
 ├── src/
 │   ├── config.py                    # Central path + dataset configuration
 │   ├── train.py                     # Training pipeline + MLflow logging
 │   ├── explain.py                   # SHAP global feature importance
 │   ├── learning_curve.py            # Bias-variance analysis
-│   ├── model_selection.py           # Interpretable model selection logic
+│   ├── model_selection.py           # Interpretability-aware model selection
 │   └── mlflow_comparison.py         # MLflow metrics fetcher for UI
 ├── data/
 │   ├── pd_speech_features.csv       # Dataset (DVC tracked)
 │   └── pd_speech_features.csv.dvc   # DVC pointer file
 ├── models/                          # Trained artifacts (gitignored)
 │   ├── model.pkl                    # Production XGBoost model
-│   ├── scaler.pkl                   # Fitted StandardScaler
-│   ├── selector.pkl                 # Fitted SelectFromModel
+│   ├── scaler.pkl                   # Fitted StandardScaler (100 features)
+│   ├── selector.pkl                 # Fitted SelectFromModel (753 → 100)
 │   ├── feature_names.pkl            # 100 selected feature names
 │   └── column_order.pkl             # Training column order (753 features)
 ├── artifacts/
-│   └── model_metrics.json           # Per-run comparison metrics
+│   ├── model_metrics.json           # Per-model comparison metrics
+│   └── feature_config.json          # Top features + column means
 ├── static/                          # Frontend assets + generated charts
 │   ├── feature_importance.png       # SHAP global chart
 │   ├── learning_curve.png           # Bias-variance plot
+│   ├── shap_bar.png                 # Per-prediction SHAP chart
 │   ├── feature_medians.json         # Feature defaults for prediction form
+│   ├── feature_insights.json        # Biomarker analysis data
 │   └── script.js / style.css        # UI assets
 ├── templates/
-│   └── index.html                   # Jinja2 UI template
+│   └── index.html                   # Jinja2 6-tab UI template
+├── monitoring/
+│   ├── baseline_data.csv            # X_train_sel saved after training
+│   ├── current_data.csv             # API inputs logged per prediction
+│   ├── drift_check.py               # Evidently drift detection script
+│   ├── drift_report.html            # Interactive Evidently report
+│   ├── drift_summary.txt            # Plain-text drift summary
+│   └── drift_feature_details.csv    # Per-feature KS p-values
 ├── notebooks/
 │   └── Parkinsons_Detection_MLOPS_Project_SMOTE.ipynb
+├── docs/
+│   └── TECHNICAL_DOCUMENTATION.md  # Full technical reference
 ├── dvc.yaml                         # DVC pipeline definition
 ├── Dockerfile                       # Multi-stage container build
-├── Jenkinsfile                      # 6-stage CI/CD pipeline
+├── Jenkinsfile                      # 7-stage CI/CD pipeline
 ├── requirements.txt                 # Full pinned dependencies
 ├── requirements-api.txt             # API-only dependencies (Docker)
 └── .env.example                     # Credentials template
@@ -197,7 +278,7 @@ selector.fit(X_train_fs, y_train_fs)   # 753 → 100 features
 
 ### Step 2 — Scaling
 
-`StandardScaler` applied after selection (select → scale). Fitted only on training data to prevent leakage.
+`StandardScaler` applied **after** selection (`select → scale`). Fitted only on training data to prevent leakage.
 
 ### Step 3 — SMOTE inside ImbPipeline
 
@@ -213,7 +294,7 @@ SMOTE is applied **inside each CV fold** — validation folds always contain rea
 
 ### Step 4 — Model Training
 
-| Model | Data | Search Iterations | Key Params Tuned |
+| Model | Input | Iterations | Key Params Tuned |
 |---|---|---|---|
 | Logistic Regression | Scaled | 20 | C, solver |
 | Random Forest | Unscaled | 20 | n_estimators, max_depth, max_features |
@@ -228,14 +309,14 @@ SMOTE is applied **inside each CV fold** — validation folds always contain rea
 
 | Model | Accuracy | Macro F1 | ROC AUC | Selected |
 |---|---|---|---|---|
-| **XGBoost** | **0.89** | **0.855** | **0.946** | ✅ Production |
-| SVM | 0.87 | 0.833 | 0.920 | |
-| Random Forest | 0.87 | 0.828 | 0.931 | |
-| KNN | 0.83 | 0.804 | 0.947 | |
-| Logistic Regression | 0.82 | 0.776 | 0.859 | |
-| Decision Tree | 0.84 | 0.766 | 0.747 | |
+| SVM | 0.895 | 0.854 | 0.964 | |
+| KNN | 0.882 | 0.858 | 0.950 | |
+| **XGBoost** | **0.882** | **0.836** | **0.943** | ✅ Production |
+| Random Forest | 0.862 | 0.817 | 0.919 | |
+| Decision Tree | 0.849 | 0.809 | 0.818 | |
+| Logistic Regression | 0.829 | 0.783 | 0.830 | |
 
-All metrics are macro-averaged on the held-out test set (152 samples). XGBoost is selected as the production model for interpretability, not just raw performance — SHAP `TreeExplainer` provides fast, exact feature attribution essential for clinical transparency.
+All metrics are macro-averaged on the held-out test set (152 samples). XGBoost is selected for interpretability — SHAP `TreeExplainer` provides fast, exact feature attribution essential for clinical transparency.
 
 ### Best XGBoost Configuration
 
@@ -252,16 +333,16 @@ subsample        : 0.8
 
 ### Global Feature Importance
 
-- `TreeExplainer` computes mean absolute SHAP values across 100 sampled rows
-- Top 20 most influential speech biomarkers plotted and saved to `static/feature_importance.png`
-- Displayed in the Feature Importance tab
+- `TreeExplainer` computes mean absolute SHAP values across 50 sampled rows
+- Top 20 most influential speech biomarkers plotted → `static/feature_importance.png`
+- Displayed in the **Feature Importance** tab
 
 ### Per-Prediction Explanation
 
 Every `/predict` call returns:
 - Top 10 SHAP feature contributions with actual feature names
 - A server-generated `shap_bar.png` (dark-themed horizontal bar chart)
-- Color coding: 🔴 red = pushes toward Parkinson's, 🟢 green = pushes toward Healthy
+- 🔴 Red = pushes toward Parkinson's · 🟢 Green = pushes toward Healthy
 
 ```json
 {
@@ -285,15 +366,7 @@ dagshub.init(repo_owner="nishnarudkar", repo_name="...", mlflow=True)
 mlflow.set_experiment("parkinson_detection")
 ```
 
-Each run logs: `accuracy`, `macro_f1`, `roc_auc`, `precision`, `recall`, hyperparameters, and the serialised model. XGBoost is registered atomically:
-
-```python
-mlflow.sklearn.log_model(
-    best_tuned_xgb,
-    name="model",
-    registered_model_name="parkinson_detection_model",
-)
-```
+Each run logs: `accuracy`, `macro_f1`, `roc_auc`, `precision`, `recall`, hyperparameters, and the serialised model. XGBoost is registered atomically in the MLflow Model Registry.
 
 ### DVC Pipeline
 
@@ -310,7 +383,7 @@ Run with: `dvc repro`
 
 ## 🌐 Web Application
 
-Four-tab dark-themed UI served by FastAPI + Jinja2:
+Six-tab dark-themed UI served by FastAPI + Jinja2:
 
 | Tab | Content |
 |---|---|
@@ -318,8 +391,45 @@ Four-tab dark-themed UI served by FastAPI + Jinja2:
 | 📈 Learning Curve | Bias-variance plot with confidence bands + legend |
 | 🔬 Prediction | 5-input form (top SHAP features) + result card + SHAP explanation |
 | 📋 Model Comparison | Live leaderboard from MLflow metrics |
+| 🔎 Feature Insights | Biomarker analysis — Parkinson's vs. Healthy mean comparisons |
+| 📡 Drift Monitor | Live drift dashboard — status banner, drifted features chart, full feature table |
 
-**UI features:** dark theme, loading spinner, animated probability bar, color-coded results, responsive grid layout, feature range hints, tooltip explanations.
+**UI features:** dark theme, loading spinner, animated probability bar, color-coded results, responsive grid layout, feature range hints, filter buttons, Chart.js visualisations.
+
+---
+
+## 📡 Drift Monitoring
+
+### How It Works
+
+```
+Training run
+    └── saves monitoring/baseline_data.csv  (X_train_sel, unscaled)
+
+Every /predict call
+    └── appends to monitoring/current_data.csv  (same feature space)
+
+python monitoring/drift_check.py
+    └── Evidently KS test: baseline vs. current
+    └── saves drift_report.html, drift_summary.txt, drift_feature_details.csv
+
+GET /drift-status
+    └── reads those files → Drift Monitor tab renders live dashboard
+```
+
+### Drift Monitor Tab
+
+The **📡 Drift Monitor** tab in the UI shows:
+- Status banner (green = no drift / red = drift detected) with % drifted and count gauge
+- Bar chart of the top 15 most drifted features by KS p-value
+- Full feature table with **All / Drifted only / Stable only** filter
+- Blue info note when simulated data is used (< 50 real predictions logged)
+
+> A feature is considered drifted when its KS p-value < 0.05. If more than 50% of features drift, retraining is recommended.
+
+### Jenkins Integration
+
+The `Drift Detection` stage runs after every build and archives `drift_report.html` as a Jenkins build artifact.
 
 ---
 
@@ -332,10 +442,7 @@ Four-tab dark-themed UI served by FastAPI + Jinja2:
 
 ### `POST /predict`
 
-**Request:**
-```json
-{ "features": [753 floats in training column order] }
-```
+**Request:** `{ "features": [753 floats in training column order] }`
 
 **Response:**
 ```json
@@ -351,13 +458,35 @@ Four-tab dark-themed UI served by FastAPI + Jinja2:
 ```
 
 ### `GET /feature-defaults`
-Returns top 5 SHAP-ranked features with `median`, `min`, `max` values and all 753 column defaults for the prediction form.
+Returns top 5 SHAP-ranked features with `median`, `min`, `max` and all 753 column medians.
 
 ### `GET /model-comparison`
-Returns live model metrics from `artifacts/model_metrics.json` (or MLflow fallback), sorted by ROC AUC.
+Returns model leaderboard from `artifacts/model_metrics.json`, sorted by ROC AUC.
 
 ### `GET /top-features`
 Returns top 5 globally important features by mean absolute SHAP value.
+
+### `GET /drift-status`
+Returns latest drift check results.
+
+**Response:**
+```json
+{
+  "summary": {
+    "total_features": 100,
+    "drifted_count": 42,
+    "drift_pct": 42.0,
+    "generated_at": "2026-04-05 02:28:52",
+    "status": "No significant dataset drift"
+  },
+  "features": [
+    { "feature": "std_10th_delta_delta", "p_value": 0.0,    "drifted": true  },
+    { "feature": "std_Log_energy",       "p_value": 0.9929, "drifted": false }
+  ]
+}
+```
+
+**404** if drift files don't exist — run `python monitoring/drift_check.py` first.
 
 ---
 
@@ -388,7 +517,14 @@ dvc pull
 
 ## ▶️ Running the Project
 
-### Option A — Step by step
+### Option A — DVC pipeline (recommended)
+
+```bash
+dvc repro
+uvicorn api.main:app --host 0.0.0.0 --port 8000
+```
+
+### Option B — Step by step
 
 ```bash
 python src/train.py          # Train all 6 models, save artifacts
@@ -397,35 +533,34 @@ python src/learning_curve.py # Generate bias-variance learning curve
 uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
 
-### Option B — DVC pipeline (recommended)
+Open **http://localhost:8000**
+
+### Drift Monitoring
 
 ```bash
-dvc repro
-uvicorn api.main:app --host 0.0.0.0 --port 8000
+# After running some predictions through the UI:
+python monitoring/drift_check.py
+# Then open the Drift Monitor tab in the UI
 ```
-
-Open **http://localhost:8000**
 
 ### What each step produces
 
 | Script | Outputs |
 |---|---|
-| `train.py` | `models/*.pkl`, `artifacts/model_metrics.json`, `static/feature_medians.json` |
+| `train.py` | `models/*.pkl`, `artifacts/model_metrics.json`, `static/feature_medians.json`, `monitoring/baseline_data.csv` |
 | `explain.py` | `static/feature_importance.png` |
 | `learning_curve.py` | `static/learning_curve.png` |
+| `drift_check.py` | `monitoring/drift_report.html`, `drift_summary.txt`, `drift_feature_details.csv` |
 | `uvicorn` | Live web app at port 8000 |
 
 ---
 
 ## 🐳 Docker Deployment
 
-The Dockerfile uses a **multi-stage build** — only API dependencies are installed in the runtime image, keeping it lean.
+Multi-stage build — only API dependencies in the runtime image.
 
 ```bash
-# Build
 docker build -t parkinson-ml .
-
-# Run
 docker run -p 8000:8000 parkinson-ml
 ```
 
@@ -435,22 +570,19 @@ Open **http://localhost:8000**
 
 ## 🔄 CI/CD with Jenkins
 
-The `Jenkinsfile` defines a **6-stage automated pipeline** triggered on every push:
-
-```
-Install Deps → Pull Data (DVC) → Train → Generate Charts → Smoke Test → Build Docker
-```
+7-stage automated pipeline (Windows agent, `bat` commands):
 
 | Stage | Command |
 |---|---|
 | Install Dependencies | `pip install -r requirements.txt` |
-| Pull Data (DVC) | `dvc pull` |
+| Pull Data (DVC) | `dvc pull data/pd_speech_features.csv.dvc --force` |
 | Train Model | `python src/train.py` |
-| Generate Explanations | `python src/explain.py && python src/learning_curve.py` |
+| Generate Explanations | `python src/explain.py` + `python src/learning_curve.py` |
 | Smoke Test | `curl -f http://localhost:8000/health` |
-| Build Docker Image | `docker build -t parkinson-ml .` |
+| Build Docker Image | `docker build -t parkinson-api .` |
+| Drift Detection | `python monitoring/drift_check.py` → archives `drift_report.html` |
 
-Credentials (`DAGSHUB_USERNAME`, `DAGSHUB_TOKEN`) are injected via Jenkins credentials store — never hardcoded in source.
+Credentials injected via Jenkins credentials store — never hardcoded.
 
 ---
 
@@ -458,78 +590,17 @@ Credentials (`DAGSHUB_USERNAME`, `DAGSHUB_TOKEN`) are injected via Jenkins crede
 
 | Category | Tools |
 |---|---|
-| ML / Data | scikit-learn, XGBoost, pandas, numpy, imbalanced-learn, scipy |
-| Explainability | SHAP (TreeExplainer + KernelExplainer) |
-| Experiment Tracking | MLflow 3.x, DagsHub |
-| Data Versioning | DVC 3.x |
-| Web Framework | FastAPI, Uvicorn, Jinja2 |
+| ML / Data | scikit-learn 1.8, XGBoost 3.2, pandas 2.3, numpy 2.4, imbalanced-learn 0.14, scipy 1.17 |
+| Explainability | SHAP 0.51 (TreeExplainer + KernelExplainer) |
+| Experiment Tracking | MLflow 3.10, DagsHub 0.6.9 |
+| Data Versioning | DVC 3.67 |
+| Drift Monitoring | Evidently 0.7 |
+| Web Framework | FastAPI 0.135, Uvicorn 0.42, Jinja2 3.1 |
 | Frontend | HTML5, CSS3, JavaScript, Chart.js |
 | Containerisation | Docker (multi-stage) |
-| CI/CD | Jenkins |
-| Visualisation | matplotlib, seaborn |
-| Notebook | Google Colab |
+| CI/CD | Jenkins (7-stage, Windows) |
+| Visualisation | matplotlib 3.10, seaborn 0.13 |
 
 ---
 
-## 📡 Automated Monitoring & Data Drift Detection
-
-### What is Data Drift?
-
-Data drift occurs when the statistical distribution of production input data shifts away from the training data distribution. In a medical ML system, this can happen when:
-- Patient demographics change over time
-- Recording equipment or protocols change
-- New speech patterns emerge in the population
-
-### Why It Matters in Healthcare ML
-
-In clinical applications, a drifted model may silently produce incorrect predictions without any obvious error. Unlike software bugs, drift is invisible without active monitoring — making it especially dangerous in a Parkinson's detection context where false negatives could delay diagnosis.
-
-### How Evidently Is Used
-
-[Evidently](https://www.evidentlyai.com/) compares the **baseline distribution** (training data) against **current production inputs** logged by the API.
-
-```
-monitoring/
-├── baseline_data.csv    # X_train features saved after each training run
-├── current_data.csv     # API inputs appended on every /predict call
-└── drift_report.html    # Generated HTML report (interactive)
-```
-
-Run drift detection manually:
-```bash
-python monitoring/drift_check.py
-```
-
-The script:
-1. Loads `baseline_data.csv` as the reference distribution
-2. Loads `current_data.csv` (production inputs)
-3. Runs `DataDriftPreset` from Evidently
-4. Saves an interactive HTML report to `monitoring/drift_report.html`
-5. Exits gracefully if current data is missing or insufficient
-
-### How Jenkins Automates It
-
-The `Jenkinsfile` includes a **Drift Detection** stage that runs after every build:
-
-```
-Train → Explain → Smoke Test → Build Docker → Drift Detection
-```
-
-The drift report is archived as a Jenkins build artifact, making it accessible from the Jenkins UI after every pipeline run.
-
-### MLflow Local Tracking
-
-Every prediction is logged to a local MLflow run (no server required):
-- **Param:** `model_type` (e.g., `XGBClassifier`)
-- **Metrics:** `prediction` (0 or 1), `probability` (confidence score)
-
-View locally with:
-```bash
-mlflow ui
-```
-
-Open `http://localhost:5000` to browse prediction history.
-
----
-
-This project is intended for **research and educational purposes only**. It is not a validated medical diagnostic tool. Do not use predictions from this system for clinical decision-making. Always consult a qualified healthcare professional for medical advice.
+> ⚠️ This project is intended for **research and educational purposes only**. It is not a validated medical diagnostic tool. Do not use predictions from this system for clinical decision-making. Always consult a qualified healthcare professional for medical advice.
