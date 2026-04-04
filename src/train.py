@@ -4,6 +4,14 @@ import warnings
 import sys
 from pathlib import Path
 
+# ── Load .env file so credentials are available ───────────────────────────────
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+except ImportError:
+    pass  # python-dotenv not installed — rely on shell environment variables
+# ─────────────────────────────────────────────────────────────────────────────
+
 # Ensure project root is on sys.path so `src.config` resolves from any cwd
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.config import (
