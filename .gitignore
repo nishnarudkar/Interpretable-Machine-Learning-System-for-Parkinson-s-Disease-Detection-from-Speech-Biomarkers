@@ -32,6 +32,10 @@ data/pd_speech_features.csv
 .env
 .dvc/config.local
 
+# Monitoring — keep structure but ignore generated reports and large CSVs
+monitoring/drift_report.html
+monitoring/current_data.csv
+
 # OS
 .DS_Store
 Thumbs.db

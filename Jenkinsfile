@@ -56,6 +56,17 @@ pipeline {
       }
     }
 
+    stage('Drift Detection') {
+      steps {
+        bat 'python monitoring/drift_check.py'
+      }
+      post {
+        always {
+          archiveArtifacts artifacts: 'monitoring/drift_report.html', allowEmptyArchive: true
+        }
+      }
+    }
+
   }
 
   post {

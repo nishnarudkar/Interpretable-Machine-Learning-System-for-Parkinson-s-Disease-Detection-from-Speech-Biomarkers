@@ -471,6 +471,65 @@ Credentials (`DAGSHUB_USERNAME`, `DAGSHUB_TOKEN`) are injected via Jenkins crede
 
 ---
 
-## ⚠️ Disclaimer
+## 📡 Automated Monitoring & Data Drift Detection
+
+### What is Data Drift?
+
+Data drift occurs when the statistical distribution of production input data shifts away from the training data distribution. In a medical ML system, this can happen when:
+- Patient demographics change over time
+- Recording equipment or protocols change
+- New speech patterns emerge in the population
+
+### Why It Matters in Healthcare ML
+
+In clinical applications, a drifted model may silently produce incorrect predictions without any obvious error. Unlike software bugs, drift is invisible without active monitoring — making it especially dangerous in a Parkinson's detection context where false negatives could delay diagnosis.
+
+### How Evidently Is Used
+
+[Evidently](https://www.evidentlyai.com/) compares the **baseline distribution** (training data) against **current production inputs** logged by the API.
+
+```
+monitoring/
+├── baseline_data.csv    # X_train features saved after each training run
+├── current_data.csv     # API inputs appended on every /predict call
+└── drift_report.html    # Generated HTML report (interactive)
+```
+
+Run drift detection manually:
+```bash
+python monitoring/drift_check.py
+```
+
+The script:
+1. Loads `baseline_data.csv` as the reference distribution
+2. Loads `current_data.csv` (production inputs)
+3. Runs `DataDriftPreset` from Evidently
+4. Saves an interactive HTML report to `monitoring/drift_report.html`
+5. Exits gracefully if current data is missing or insufficient
+
+### How Jenkins Automates It
+
+The `Jenkinsfile` includes a **Drift Detection** stage that runs after every build:
+
+```
+Train → Explain → Smoke Test → Build Docker → Drift Detection
+```
+
+The drift report is archived as a Jenkins build artifact, making it accessible from the Jenkins UI after every pipeline run.
+
+### MLflow Local Tracking
+
+Every prediction is logged to a local MLflow run (no server required):
+- **Param:** `model_type` (e.g., `XGBClassifier`)
+- **Metrics:** `prediction` (0 or 1), `probability` (confidence score)
+
+View locally with:
+```bash
+mlflow ui
+```
+
+Open `http://localhost:5000` to browse prediction history.
+
+---
 
 This project is intended for **research and educational purposes only**. It is not a validated medical diagnostic tool. Do not use predictions from this system for clinical decision-making. Always consult a qualified healthcare professional for medical advice.

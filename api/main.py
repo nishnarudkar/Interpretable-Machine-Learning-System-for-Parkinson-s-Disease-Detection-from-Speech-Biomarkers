@@ -165,6 +165,16 @@ def predict(data: FeatureInput):
         arr_selected = selector.transform(arr)        # 753 → 100 features
         arr_scaled   = scaler.transform(arr_selected) # standardise
 
+        # ── Log input to monitoring/current_data.csv ──────────────────────────
+        try:
+            _monitoring_csv = Path(__file__).resolve().parent.parent / "monitoring" / "current_data.csv"
+            _log_df = pd.DataFrame(arr_selected, columns=feature_names)
+            _write_header = not _monitoring_csv.exists() or _monitoring_csv.stat().st_size == 0
+            _log_df.to_csv(_monitoring_csv, mode="a", header=_write_header, index=False)
+        except Exception as _log_err:
+            logger.warning(f"Prediction logging failed (non-fatal): {_log_err}")
+        # ─────────────────────────────────────────────────────────────────────
+
         # Prediction
         prediction = int(model.predict(arr_scaled)[0])
         prob       = float(model.predict_proba(arr_scaled)[0][1])
@@ -207,6 +217,18 @@ def predict(data: FeatureInput):
         plt.savefig(shap_bar_path, dpi=120, bbox_inches="tight",
                     facecolor=fig.get_facecolor())
         plt.close(fig)
+        # ─────────────────────────────────────────────────────────────────────
+
+        # ── Lightweight local MLflow tracking (no server required) ──────────
+        try:
+            import mlflow as _mlflow
+            _mlflow.set_tracking_uri("mlruns")   # local filesystem only
+            with _mlflow.start_run(run_name="prediction", nested=True):
+                _mlflow.log_param("model_type", type(model).__name__)
+                _mlflow.log_metric("prediction", float(prediction))
+                _mlflow.log_metric("probability", prob)
+        except Exception as _mf_err:
+            logger.debug(f"MLflow local tracking skipped: {_mf_err}")
         # ─────────────────────────────────────────────────────────────────────
 
         return {

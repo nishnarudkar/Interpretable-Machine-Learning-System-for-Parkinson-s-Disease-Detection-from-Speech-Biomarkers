@@ -106,6 +106,15 @@ print(f"Selected features: {X_train_sel.shape[1]}")
 # Save selected feature names for the API
 selected_feature_names = list(X.columns[selector.get_support()])
 
+# ── Save baseline data for drift monitoring ───────────────────────────────────
+import pathlib as _pl
+_monitoring_dir = _pl.Path(__file__).resolve().parent.parent / "monitoring"
+_monitoring_dir.mkdir(exist_ok=True)
+_baseline_path  = _monitoring_dir / "baseline_data.csv"
+pd.DataFrame(X_train_sel, columns=selected_feature_names).to_csv(_baseline_path, index=False)
+print(f"Saved monitoring baseline: {_baseline_path} ({X_train_sel.shape[0]} rows)")
+# ─────────────────────────────────────────────────────────────────────────────
+
 
 # --------------------------------
 # Scaling (after selection — select → scale order)
