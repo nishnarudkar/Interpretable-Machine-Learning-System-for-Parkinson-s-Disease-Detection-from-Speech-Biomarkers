@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🧠 Interpretable ML System for Parkinson's Disease Detection
+# Interpretable ML System for Parkinson's Disease Detection
 
 ### From Speech Biomarkers to Clinical Insights
 
@@ -24,45 +24,45 @@
 
 ---
 
-## 👥 Authors
+## Authors
 
 <div align="center">
 
-| | Name | GitHub |
-|---|---|---|
-| 🧑‍💻 | Nishant Narudkar | [@nishnarudkar](https://github.com/nishnarudkar) |
-| 🧑‍💻 | Maitreya Pawar | [@Metzo64](https://github.com/Metzo64) |
-| 🧑‍💻 | Vatsal Parmar | [@Vatsal211005](https://github.com/Vatsal211005) |
-| 🧑‍💻 | Aamir Sarang | [@Aamir-Sarang31](https://github.com/Aamir-Sarang31) |
+| Name | GitHub |
+|---|---|
+| Nishant Narudkar | [@nishnarudkar](https://github.com/nishnarudkar) |
+| Maitreya Pawar | [@Metzo64](https://github.com/Metzo64) |
+| Vatsal Parmar | [@Vatsal211005](https://github.com/Vatsal211005) |
+| Aamir Sarang | [@Aamir-Sarang31](https://github.com/Aamir-Sarang31) |
 
 </div>
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
-- [Overview](#-overview)
-- [System Architecture](#-system-architecture)
-- [Full Pipeline Flow](#-full-pipeline-flow)
-- [Dataset](#-dataset)
-- [Project Structure](#-project-structure)
-- [ML Pipeline](#-ml-pipeline)
-- [Model Results](#-model-results)
-- [Explainability (SHAP)](#-explainability-shap)
-- [MLOps Stack](#-mlops-stack)
-- [Web Application](#-web-application)
-- [Drift Monitoring](#-drift-monitoring)
-- [API Reference](#-api-reference)
-- [Installation & Setup](#-installation--setup)
-- [Running the Project](#-running-the-project)
-- [Docker Deployment](#-docker-deployment)
-- [CI/CD with Jenkins](#-cicd-with-jenkins)
-- [Technology Stack](#-technology-stack)
-- [Disclaimer](#-disclaimer)
+- [Overview](#overview)
+- [System Architecture](#system-architecture)
+- [Full Pipeline Flow](#full-pipeline-flow)
+- [Dataset](#dataset)
+- [Project Structure](#project-structure)
+- [ML Pipeline](#ml-pipeline)
+- [Model Results](#model-results)
+- [Explainability (SHAP)](#explainability-shap)
+- [MLOps Stack](#mlops-stack)
+- [Web Application](#web-application)
+- [Drift Monitoring](#drift-monitoring)
+- [API Reference](#api-reference)
+- [Installation & Setup](#installation--setup)
+- [Running the Project](#running-the-project)
+- [Docker Deployment](#docker-deployment)
+- [CI/CD with Jenkins](#cicd-with-jenkins)
+- [Technology Stack](#technology-stack)
+- [Disclaimer](#disclaimer)
 
 ---
 
-## 🔍 Overview
+## Overview
 
 Parkinson's disease is a progressive neurological disorder whose earliest symptoms often manifest as measurable changes in speech patterns. This project builds a full MLOps system that bridges research and production:
 
@@ -84,7 +84,7 @@ Parkinson's disease is a progressive neurological disorder whose earliest sympto
 
 ---
 
-## 🏗 System Architecture
+## System Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -130,16 +130,16 @@ Parkinson's disease is a progressive neurological disorder whose earliest sympto
 
 ---
 
-## 🔄 Full Pipeline Flow
+## Full Pipeline Flow
 
 ```mermaid
 flowchart TD
-    A([🗄️ Raw Dataset\npd_speech_features.csv]) --> B[DVC Pull\nfrom DagsHub]
-    B --> C[load_dataset\n756 rows × 753 features]
+    A([Raw Dataset\npd_speech_features.csv]) --> B[DVC Pull\nfrom DagsHub]
+    B --> C[load_dataset\n756 rows x 753 features]
 
     C --> D[train_test_split\n80/20 stratified]
     D --> E[SMOTE on X_train\nfor selector only]
-    E --> F[SelectFromModel RF\n753 → 100 features]
+    E --> F[SelectFromModel RF\n753 to 100 features]
     F --> G[StandardScaler\nfit on X_train_sel]
 
     G --> H{6 Models\nRandomizedSearchCV\n+ ImbPipeline}
@@ -148,7 +148,7 @@ flowchart TD
     H --> H3[SVM]
     H --> H4[KNN]
     H --> H5[Decision Tree]
-    H --> H6[XGBoost ✅]
+    H --> H6[XGBoost - Production]
 
     H1 & H2 & H3 & H4 & H5 & H6 --> I[MLflow\nLog all runs\nto DagsHub]
     H6 --> J[Save Production\nArtifacts\nmodels/*.pkl]
@@ -165,12 +165,12 @@ flowchart TD
     I --> P
 
     P --> Q[6-Tab Dark UI\nlocalhost:8000]
-    Q --> R[📊 Feature Importance]
-    Q --> S[📈 Learning Curve]
-    Q --> T[🔬 Prediction]
-    Q --> U[📋 Model Comparison]
-    Q --> V[🔎 Feature Insights]
-    Q --> W[📡 Drift Monitor]
+    Q --> R[Feature Importance]
+    Q --> S[Learning Curve]
+    Q --> T[Prediction]
+    Q --> U[Model Comparison]
+    Q --> V[Feature Insights]
+    Q --> W[Drift Monitor]
 
     T -->|POST /predict| X[select → scale → XGBoost\n+ SHAP explanation]
     X -->|append| Y[current_data.csv]
@@ -182,7 +182,7 @@ flowchart TD
 
 ---
 
-## 📊 Dataset
+## Dataset
 
 | Property | Value |
 |---|---|
@@ -208,7 +208,7 @@ flowchart TD
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 .
@@ -263,7 +263,7 @@ flowchart TD
 
 ---
 
-## ⚙️ ML Pipeline
+## ML Pipeline
 
 ### Step 1 — Feature Selection
 
@@ -305,13 +305,13 @@ SMOTE is applied **inside each CV fold** — validation folds always contain rea
 
 ---
 
-## 📈 Model Results
+## Model Results
 
 | Model | Accuracy | Macro F1 | ROC AUC | Selected |
 |---|---|---|---|---|
 | SVM | 0.895 | 0.854 | 0.964 | |
 | KNN | 0.882 | 0.858 | 0.950 | |
-| **XGBoost** | **0.882** | **0.836** | **0.943** | ✅ Production |
+| **XGBoost** | **0.882** | **0.836** | **0.943** | Production |
 | Random Forest | 0.862 | 0.817 | 0.919 | |
 | Decision Tree | 0.849 | 0.809 | 0.818 | |
 | Logistic Regression | 0.829 | 0.783 | 0.830 | |
@@ -329,20 +329,20 @@ subsample        : 0.8
 
 ---
 
-## 🔬 Explainability (SHAP)
+## Explainability (SHAP)
 
 ### Global Feature Importance
 
 - `TreeExplainer` computes mean absolute SHAP values across 50 sampled rows
-- Top 20 most influential speech biomarkers plotted → `static/feature_importance.png`
-- Displayed in the **Feature Importance** tab
+- Top 20 most influential speech biomarkers plotted to `static/feature_importance.png`
+- Displayed in the Feature Importance tab
 
 ### Per-Prediction Explanation
 
 Every `/predict` call returns:
 - Top 10 SHAP feature contributions with actual feature names
 - A server-generated `shap_bar.png` (dark-themed horizontal bar chart)
-- 🔴 Red = pushes toward Parkinson's · 🟢 Green = pushes toward Healthy
+- Positive values push toward Parkinson's, negative values push toward Healthy
 
 ```json
 {
@@ -357,7 +357,7 @@ Full `ImbPipeline` (SMOTE → SelectFromModel → StandardScaler → model) refi
 
 ---
 
-## 🛠 MLOps Stack
+## MLOps Stack
 
 ### MLflow + DagsHub
 
@@ -381,24 +381,22 @@ Run with: `dvc repro`
 
 ---
 
-## 🌐 Web Application
+## Web Application
 
 Six-tab dark-themed UI served by FastAPI + Jinja2:
 
 | Tab | Content |
 |---|---|
-| 📊 Feature Importance | Global SHAP chart + top 5 biomarkers ranked list |
-| 📈 Learning Curve | Bias-variance plot with confidence bands + legend |
-| 🔬 Prediction | 5-input form (top SHAP features) + result card + SHAP explanation |
-| 📋 Model Comparison | Live leaderboard from MLflow metrics |
-| 🔎 Feature Insights | Biomarker analysis — Parkinson's vs. Healthy mean comparisons |
-| 📡 Drift Monitor | Live drift dashboard — status banner, drifted features chart, full feature table |
-
-**UI features:** dark theme, loading spinner, animated probability bar, color-coded results, responsive grid layout, feature range hints, filter buttons, Chart.js visualisations.
+| Feature Importance | Global SHAP chart + top 5 biomarkers ranked list |
+| Learning Curve | Bias-variance plot with confidence bands + legend |
+| Prediction | 5-input form (top SHAP features) + result card + SHAP explanation |
+| Model Comparison | Live leaderboard from MLflow metrics |
+| Feature Insights | Biomarker analysis — Parkinson's vs. Healthy mean comparisons |
+| Drift Monitor | Live drift dashboard — status banner, drifted features chart, full feature table |
 
 ---
 
-## 📡 Drift Monitoring
+## Drift Monitoring
 
 ### How It Works
 
@@ -419,21 +417,20 @@ GET /drift-status
 
 ### Drift Monitor Tab
 
-The **📡 Drift Monitor** tab in the UI shows:
-- Status banner (green = no drift / red = drift detected) with % drifted and count gauge
+- Status banner (green = no drift / red = drift detected) with percentage and count gauge
 - Bar chart of the top 15 most drifted features by KS p-value
-- Full feature table with **All / Drifted only / Stable only** filter
-- Blue info note when simulated data is used (< 50 real predictions logged)
+- Full feature table with All / Drifted only / Stable only filter
+- Info note when simulated data is used (fewer than 50 real predictions logged)
 
-> A feature is considered drifted when its KS p-value < 0.05. If more than 50% of features drift, retraining is recommended.
+A feature is considered drifted when its KS p-value < 0.05. If more than 50% of features drift, retraining is recommended.
 
 ### Jenkins Integration
 
-The `Drift Detection` stage runs after every build and archives `drift_report.html` as a Jenkins build artifact.
+The Drift Detection stage runs after every build and archives `drift_report.html` as a Jenkins build artifact.
 
 ---
 
-## 📡 API Reference
+## API Reference
 
 ### `GET /health`
 ```json
@@ -486,11 +483,11 @@ Returns latest drift check results.
 }
 ```
 
-**404** if drift files don't exist — run `python monitoring/drift_check.py` first.
+Returns `404` if drift files don't exist — run `python monitoring/drift_check.py` first.
 
 ---
 
-## 🚀 Installation & Setup
+## Installation & Setup
 
 ```bash
 # 1. Clone the repository
@@ -515,7 +512,7 @@ dvc pull
 
 ---
 
-## ▶️ Running the Project
+## Running the Project
 
 ### Option A — DVC pipeline (recommended)
 
@@ -527,9 +524,9 @@ uvicorn api.main:app --host 0.0.0.0 --port 8000
 ### Option B — Step by step
 
 ```bash
-python src/train.py          # Train all 6 models, save artifacts
-python src/explain.py        # Generate SHAP feature importance chart
-python src/learning_curve.py # Generate bias-variance learning curve
+python src/train.py
+python src/explain.py
+python src/learning_curve.py
 uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
 
@@ -538,9 +535,9 @@ Open **http://localhost:8000**
 ### Drift Monitoring
 
 ```bash
-# After running some predictions through the UI:
+# After running predictions through the UI:
 python monitoring/drift_check.py
-# Then open the Drift Monitor tab in the UI
+# Then open the Drift Monitor tab
 ```
 
 ### What each step produces
@@ -555,7 +552,7 @@ python monitoring/drift_check.py
 
 ---
 
-## 🐳 Docker Deployment
+## Docker Deployment
 
 Multi-stage build — only API dependencies in the runtime image.
 
@@ -568,7 +565,7 @@ Open **http://localhost:8000**
 
 ---
 
-## 🔄 CI/CD with Jenkins
+## CI/CD with Jenkins
 
 7-stage automated pipeline (Windows agent, `bat` commands):
 
@@ -580,13 +577,13 @@ Open **http://localhost:8000**
 | Generate Explanations | `python src/explain.py` + `python src/learning_curve.py` |
 | Smoke Test | `curl -f http://localhost:8000/health` |
 | Build Docker Image | `docker build -t parkinson-api .` |
-| Drift Detection | `python monitoring/drift_check.py` → archives `drift_report.html` |
+| Drift Detection | `python monitoring/drift_check.py` — archives `drift_report.html` |
 
 Credentials injected via Jenkins credentials store — never hardcoded.
 
 ---
 
-## 🧰 Technology Stack
+## Technology Stack
 
 | Category | Tools |
 |---|---|
@@ -603,4 +600,6 @@ Credentials injected via Jenkins credentials store — never hardcoded.
 
 ---
 
-> ⚠️ This project is intended for **research and educational purposes only**. It is not a validated medical diagnostic tool. Do not use predictions from this system for clinical decision-making. Always consult a qualified healthcare professional for medical advice.
+## Disclaimer
+
+This project is intended for **research and educational purposes only**. It is not a validated medical diagnostic tool. Do not use predictions from this system for clinical decision-making. Always consult a qualified healthcare professional for medical advice.
