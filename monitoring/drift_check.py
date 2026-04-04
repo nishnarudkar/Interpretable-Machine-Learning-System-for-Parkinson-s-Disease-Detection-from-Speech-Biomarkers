@@ -17,8 +17,10 @@ Outputs:
 import sys
 from pathlib import Path
 import pandas as pd
-from evidently.report import Report
-from evidently.metric_preset import DataDriftPreset
+
+# Evidently 0.7+ uses the new top-level API
+from evidently import Report
+from evidently.presets import DataDriftPreset
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 MONITORING_DIR   = Path(__file__).resolve().parent
@@ -78,7 +80,8 @@ def run_drift_report(reference: pd.DataFrame, current: pd.DataFrame) -> None:
     print("[INFO]  Running Evidently DataDriftPreset...")
 
     report = Report(metrics=[DataDriftPreset()])
-    report.run(reference_data=reference, current_data=current)
+    # Evidently 0.7+: current_data is first positional arg, reference_data is second
+    report.run(current_data=current, reference_data=reference)
 
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     report.save_html(str(REPORT_PATH))
