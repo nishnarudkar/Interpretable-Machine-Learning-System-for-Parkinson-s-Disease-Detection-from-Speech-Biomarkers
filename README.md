@@ -563,8 +563,8 @@ python monitoring/drift_check.py
 Multi-stage build — only API dependencies in the runtime image.
 
 ```bash
-docker build -t parkinson-ml .
-docker run -p 8000:8000 parkinson-ml
+docker build -t parkinson-api .
+docker run -p 8000:8000 parkinson-api
 ```
 
 Open **http://localhost:8000**
