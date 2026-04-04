@@ -52,6 +52,9 @@
     <button class="tab-btn" onclick="openTab('insights', this)">
       <span>🔎</span> Feature Insights
     </button>
+    <button class="tab-btn" onclick="openTab('drift', this)">
+      <span>📡</span> Drift Monitor
+    </button>
   </nav>
 
   <main class="main">
@@ -205,6 +208,77 @@
           <p><strong>Clinical Note:</strong> These opposing trends indicate a redistribution of spectral energy — from strong, stable peaks to irregular, noise-like fluctuations — a hallmark of Parkinsonian speech.</p>
         </div>
         <div class="insights-footer-note" style="margin-top: 24px;">Note: Values are standardized and derived from the training dataset.</div>
+      </div>
+    </div>
+
+    <!-- Drift Monitor Tab -->
+    <div id="drift" class="tabcontent">
+      <div class="card">
+        <div class="card-header">
+          <h2>📡 Data Drift Monitor</h2>
+          <p>Compares live prediction inputs against the training baseline using the Kolmogorov-Smirnov test. Run <code class="inline-code">python monitoring/drift_check.py</code> to refresh.</p>
+        </div>
+
+        <!-- Status row -->
+        <div id="drift-summary-banner" class="drift-banner drift-banner--loading">
+          <div style="display:flex;align-items:center;gap:14px;flex:1;min-width:0;">
+            <span id="drift-status-icon" style="font-size:2rem;line-height:1;flex-shrink:0;">⏳</span>
+            <div style="min-width:0;">
+              <div id="drift-status-label" style="font-size:1.05rem;font-weight:700;color:var(--text-color);">Loading…</div>
+              <div id="drift-generated-at" style="font-size:0.76rem;color:var(--muted-color);margin-top:3px;"></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:160px;">
+            <div style="display:flex;align-items:baseline;gap:8px;">
+              <span id="drift-pct-value" style="font-size:1.5rem;font-weight:800;color:var(--text-color);font-variant-numeric:tabular-nums;">—</span>
+              <span style="font-size:0.75rem;color:var(--muted-color);text-transform:uppercase;letter-spacing:.05em;">Features Drifted</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;width:100%;">
+              <div style="flex:1;height:8px;background:var(--border-color);border-radius:4px;overflow:hidden;">
+                <div id="drift-gauge-bar" class="drift-gauge-bar" style="width:0%;height:100%;border-radius:4px;transition:width .7s ease;"></div>
+              </div>
+              <span id="drift-gauge-text" style="font-size:0.78rem;font-weight:600;color:var(--muted-color);white-space:nowrap;font-variant-numeric:tabular-nums;">0 / 0</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="drift-note" class="drift-note hidden"></div>
+
+        <!-- Top drifted features chart -->
+        <div id="drift-chart-section" class="hidden" style="margin-bottom:28px;">
+          <h3 style="font-size:1rem;font-weight:700;color:var(--text-color);margin-bottom:14px;">
+            Top Drifted Features
+            <span style="font-size:0.78rem;font-weight:400;color:var(--muted-color);margin-left:6px;">(lowest p-value)</span>
+          </h3>
+          <div class="chart-wrapper">
+            <canvas id="driftChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Full feature table -->
+        <div id="drift-table-section" class="hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+            <h3 style="font-size:1rem;font-weight:700;color:var(--text-color);margin:0;">All Features</h3>
+            <div style="display:flex;gap:8px;">
+              <button class="drift-filter-btn active" onclick="filterDriftTable('all', this)">All</button>
+              <button class="drift-filter-btn" onclick="filterDriftTable('drifted', this)">Drifted only</button>
+              <button class="drift-filter-btn" onclick="filterDriftTable('stable', this)">Stable only</button>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table class="drift-table">
+              <thead>
+                <tr>
+                  <th class="dt-col-feature">Feature</th>
+                  <th class="dt-col-pval">p-value</th>                  <th class="dt-col-status">Status</th>
+                </tr>
+              </thead>
+              <tbody id="drift-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="drift-error" class="drift-error hidden"></div>
       </div>
     </div>
 

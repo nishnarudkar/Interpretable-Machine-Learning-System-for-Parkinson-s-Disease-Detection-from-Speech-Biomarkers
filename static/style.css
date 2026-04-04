@@ -1669,3 +1669,316 @@ body {
   }
 }
 
+
+/* ── Drift Monitor Tab ─────────────────────────────────────────────────────── */
+
+.inline-code {
+  font-family: 'Courier New', monospace;
+  font-size: 0.82em;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  color: var(--accent2);
+}
+
+/* Summary banner */
+.drift-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 20px 24px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  margin-bottom: 20px;
+  transition: border-color 0.3s, background 0.3s;
+}
+
+.drift-banner--loading {
+  border-color: var(--border);
+  background: var(--surface2);
+}
+
+.drift-banner--ok {
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(52, 211, 153, 0.06);
+}
+
+.drift-banner--alert {
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(248, 113, 113, 0.06);
+}
+
+.drift-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.drift-status-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.drift-status-label {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.drift-generated-at {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.drift-banner-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 180px;
+}
+
+.drift-stat-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.drift-stat-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.drift-stat-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.drift-gauge-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.drift-gauge-track {
+  flex: 1;
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.drift-gauge-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.7s ease;
+}
+
+.drift-gauge-bar--ok    { background: var(--success-color); }
+.drift-gauge-bar--alert { background: var(--danger-color); }
+
+.drift-gauge-text {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Note */
+.drift-note {
+  padding: 12px 16px;
+  background: rgba(59, 130, 246, 0.08);
+  border-left: 3px solid #3b82f6;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #93c5fd;
+  margin-bottom: 20px;
+  line-height: 1.55;
+}
+
+/* Section titles */
+.drift-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 14px;
+}
+
+.drift-section-sub {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 6px;
+}
+
+/* Chart section */
+.drift-chart-section {
+  margin-bottom: 28px;
+}
+
+/* Table section */
+.drift-table-section {
+  margin-top: 8px;
+}
+
+.drift-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.drift-table-header .drift-section-title {
+  margin-bottom: 0;
+}
+
+/* Filter buttons */
+.drift-filter-group {
+  display: flex;
+  gap: 8px;
+}
+
+.drift-filter-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.drift-filter-btn:hover {
+  border-color: rgba(108, 99, 255, 0.5);
+  color: var(--text);
+}
+
+.drift-filter-btn.active {
+  background: rgba(108, 99, 255, 0.15);
+  border-color: var(--accent);
+  color: var(--accent2);
+}
+
+/* Drift table */
+.drift-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 6px;
+  font-size: 0.88rem;
+}
+
+.drift-table thead th {
+  padding: 10px 14px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--accent2);
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+}
+
+.drift-table .dt-col-feature { text-align: left; }
+.drift-table .dt-col-pval    { text-align: center; width: 110px; }
+.drift-table .dt-col-status  { text-align: center; width: 110px; }
+
+.drift-table tbody td {
+  padding: 10px 14px;
+  background: rgba(15, 17, 23, 0.4);
+  border-top: 1px solid rgba(46, 50, 80, 0.6);
+  border-bottom: 1px solid rgba(46, 50, 80, 0.6);
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.drift-table tbody td:first-child {
+  border-left: 1px solid rgba(46, 50, 80, 0.6);
+  border-radius: 8px 0 0 8px;
+}
+
+.drift-table tbody td:last-child {
+  border-right: 1px solid rgba(46, 50, 80, 0.6);
+  border-radius: 0 8px 8px 0;
+}
+
+.dt-row-drifted td {
+  background: rgba(248, 113, 113, 0.05) !important;
+  border-color: rgba(248, 113, 113, 0.2) !important;
+}
+
+.dt-row-drifted:hover td {
+  background: rgba(248, 113, 113, 0.1) !important;
+}
+
+.drift-table tbody tr:not(.dt-row-drifted):hover td {
+  background: rgba(108, 99, 255, 0.07);
+}
+
+.dt-feat-name {
+  font-family: 'Courier New', monospace;
+  font-size: 0.82rem;
+  color: var(--text);
+}
+
+/* Drift badges */
+.drift-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.drift-badge--drifted {
+  background: rgba(248, 113, 113, 0.12);
+  color: #fca5a5;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+}
+
+.drift-badge--stable {
+  background: rgba(52, 211, 153, 0.1);
+  color: #6ee7b7;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+}
+
+/* Error state */
+.drift-error {
+  padding: 16px 20px;
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: 10px;
+  color: var(--danger-color);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .drift-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .drift-banner-right {
+    align-items: flex-start;
+    width: 100%;
+  }
+  .drift-gauge-wrap { width: 100%; }
+  .drift-table-header { flex-direction: column; align-items: flex-start; }
+}

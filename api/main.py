@@ -344,6 +344,78 @@ def model_comparison():
     return {"models": models}
 
 
+@app.get("/drift-status")
+def drift_status():
+    """
+    Return drift summary and per-feature details from the last drift_check.py run.
+    Reads monitoring/drift_summary.txt and monitoring/drift_feature_details.csv.
+    """
+    import csv
+    monitoring_dir = Path(__file__).resolve().parent.parent / "monitoring"
+    summary_path = monitoring_dir / "drift_summary.txt"
+    details_path = monitoring_dir / "drift_feature_details.csv"
+
+    logger.info(f"Drift summary path: {summary_path} exists={summary_path.exists()}")
+    logger.info(f"Drift details path: {details_path} exists={details_path.exists()}")
+
+    if not summary_path.exists() or not details_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Drift data not found at {monitoring_dir}. Run `python monitoring/drift_check.py` first.",
+        )
+
+    # Parse summary
+    summary = {}
+    try:
+        import re
+        text = summary_path.read_text(encoding="utf-8")
+        for line in text.splitlines():
+            line = line.strip()
+            m = re.match(r"Total Features\s*:\s*(\d+)", line)
+            if m:
+                summary["total_features"] = int(m.group(1))
+                continue
+            m = re.match(r"Drifted Features\s*:\s*(\d+)", line)
+            if m:
+                summary["drifted_count"] = int(m.group(1))
+                continue
+            m = re.match(r"Drift Percentage\s*:\s*([\d.]+)", line)
+            if m:
+                summary["drift_pct"] = float(m.group(1))
+                continue
+            m = re.match(r"Generated:\s*(.+)", line)
+            if m:
+                summary["generated_at"] = m.group(1).strip()
+                continue
+            m = re.match(r"Status:\s*(.+)", line)
+            if m:
+                summary["status"] = m.group(1).strip()
+                continue
+            if "[NOTE]" in line:
+                summary["note"] = line.replace("[NOTE]", "").strip()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse drift summary: {e}")
+
+    # Parse feature details
+    features = []
+    try:
+        with open(details_path, newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                features.append({
+                    "feature": row["feature"],
+                    "p_value": float(row["p_value"]),
+                    "drifted": row["drifted"].strip().lower() == "true",
+                })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse drift details: {e}")
+
+    return {
+        "summary": summary,
+        "features": features,
+    }
+
+
 @app.get("/health")
 def health():
     return {

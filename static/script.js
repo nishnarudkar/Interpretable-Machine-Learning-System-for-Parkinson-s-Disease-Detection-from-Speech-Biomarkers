@@ -8,6 +8,7 @@ function openTab(tab, btn) {
   if (tab === "comparison") loadModelComparison();
   if (tab === "prediction") loadPredictionFields();
   if (tab === "insights")   loadInsights();
+  if (tab === "drift")      loadDriftStatus();
 }
 
 /** Top-5 feature names and defaults from /feature-config (filled after first fetch). */
@@ -393,4 +394,156 @@ function renderShapChart(contributions) {
     }
   });
 }
+
+
+// ── Drift Monitor ──────────────────────────────────────────────────────────
+
+let _driftFeatures = [];
+
+async function loadDriftStatus() {
+  const banner   = document.getElementById("drift-summary-banner");
+  if (banner.dataset.loaded === "1") return;
+
+  // Reset error state on each attempt
+  const errorEl = document.getElementById("drift-error");
+  errorEl.classList.add("hidden");
+  banner.classList.remove("hidden");
+
+  try {
+    const res  = await fetch("/drift-status", { cache: "no-store" });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showDriftError(data.detail || "Could not load drift data.");
+      return;  // do NOT set loaded=1 so user can retry
+    }
+
+    const s = data.summary;
+    _driftFeatures = data.features || [];
+
+    // Banner state
+    const drifted = s.drifted_count ?? 0;
+    const total   = s.total_features ?? 0;
+    const pct     = s.drift_pct ?? 0;
+    const isDrift = pct > 50;
+
+    banner.className = "drift-banner";
+    banner.style.borderColor  = isDrift ? "rgba(248,113,113,0.45)" : "rgba(52,211,153,0.45)";
+    banner.style.background   = isDrift ? "rgba(248,113,113,0.06)" : "rgba(52,211,153,0.06)";
+    document.getElementById("drift-status-icon").textContent  = isDrift ? "⚠️" : "✅";
+    document.getElementById("drift-status-label").textContent = s.status || (isDrift ? "Drift Detected" : "No Significant Drift");
+    document.getElementById("drift-generated-at").textContent = s.generated_at ? "Last checked: " + s.generated_at : "";
+    document.getElementById("drift-pct-value").textContent    = pct.toFixed(1) + "%";
+    document.getElementById("drift-gauge-text").textContent   = drifted + " / " + total;
+
+    const bar = document.getElementById("drift-gauge-bar");
+    bar.style.width      = Math.min(pct, 100) + "%";
+    bar.style.background = isDrift ? "var(--danger-color)" : "var(--success-color)";
+
+    if (s.note) {
+      const noteEl = document.getElementById("drift-note");
+      noteEl.textContent = "ℹ " + s.note;
+      noteEl.classList.remove("hidden");
+    }
+
+    // Chart — top 15 drifted features by lowest p-value
+    const driftedFeats = _driftFeatures.filter(f => f.drifted).slice(0, 15);
+    if (driftedFeats.length > 0) {
+      document.getElementById("drift-chart-section").classList.remove("hidden");
+      renderDriftChart(driftedFeats);
+    }
+
+    // Table
+    document.getElementById("drift-table-section").classList.remove("hidden");
+    renderDriftTable(_driftFeatures, "all");
+
+    banner.dataset.loaded = "1";
+  } catch (err) {
+    showDriftError("Could not reach the API. Check that the server is running.");
+    console.error(err);
+  }
+}
+
+function renderDriftChart(features) {
+  const labels = features.map(f => f.feature);
+  const values = features.map(f => f.p_value);
+  const colors = features.map(f => f.p_value < 0.01 ? "rgba(248,113,113,0.8)" : "rgba(251,191,36,0.8)");
+
+  const ctx = document.getElementById("driftChart").getContext("2d");
+  if (window._driftChart) window._driftChart.destroy();
+
+  window._driftChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        label: "p-value",
+        data: values,
+        backgroundColor: colors,
+        borderColor: colors.map(c => c.replace("0.8", "1")),
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => " p = " + ctx.parsed.x.toExponential(2)
+          }
+        }
+      },
+      scales: {
+        x: {
+          min: 0,
+          max: 0.05,
+          grid: { color: "rgba(255,255,255,0.05)" },
+          ticks: { color: "#8892b0", callback: v => v.toExponential(1) },
+          title: { display: true, text: "p-value (KS test) — lower = more drifted", color: "#8892b0" }
+        },
+        y: {
+          grid: { display: false },
+          ticks: { color: "#8892b0", font: { family: "'Courier New', monospace", size: 11 } }
+        }
+      }
+    }
+  });
+}
+
+function renderDriftTable(features, filter) {
+  const tbody = document.getElementById("drift-table-body");
+  const rows  = filter === "drifted" ? features.filter(f => f.drifted)
+              : filter === "stable"  ? features.filter(f => !f.drifted)
+              : features;
+
+  tbody.innerHTML = rows.map(f => {
+    const rowClass  = f.drifted ? "dt-row-drifted" : "";
+    const badge     = f.drifted
+      ? '<span class="drift-badge drift-badge--drifted">Drifted</span>'
+      : '<span class="drift-badge drift-badge--stable">Stable</span>';
+    const pDisplay  = f.p_value === 0 ? "< 1e-6" : f.p_value.toExponential(2);
+    return `<tr class="${rowClass}">
+      <td class="dt-col-feature"><span class="dt-feat-name">${escapeHtml(f.feature)}</span></td>
+      <td class="dt-col-pval">${pDisplay}</td>
+      <td class="dt-col-status">${badge}</td>
+    </tr>`;
+  }).join("");
+}
+
+function filterDriftTable(filter, btn) {
+  document.querySelectorAll(".drift-filter-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  renderDriftTable(_driftFeatures, filter);
+}
+
+function showDriftError(msg) {
+  const el = document.getElementById("drift-error");
+  el.textContent = msg;
+  el.classList.remove("hidden");
+  document.getElementById("drift-summary-banner").classList.add("hidden");
+}
+
 
