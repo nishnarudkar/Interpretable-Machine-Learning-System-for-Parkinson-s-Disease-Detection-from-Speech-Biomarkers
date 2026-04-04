@@ -34,6 +34,8 @@ data/pd_speech_features.csv
 
 # Monitoring — keep structure but ignore generated reports and large CSVs
 monitoring/drift_report.html
+monitoring/drift_summary.txt
+monitoring/drift_feature_details.csv
 monitoring/current_data.csv
 
 # OS
