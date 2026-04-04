@@ -576,6 +576,34 @@ Returns top 5 globally important features by mean absolute SHAP value.
 
 ---
 
+### `GET /drift-status`
+
+Returns the latest drift check results from `monitoring/drift_summary.txt` and `monitoring/drift_feature_details.csv`. Run `python monitoring/drift_check.py` to refresh these files before calling this endpoint.
+
+**Response:**
+```json
+{
+  "summary": {
+    "total_features": 100,
+    "drifted_count": 42,
+    "drift_pct": 42.0,
+    "generated_at": "2026-04-05 02:28:52",
+    "status": "No significant dataset drift",
+    "note": "Simulated data used — near-zero drift expected."
+  },
+  "features": [
+    { "feature": "std_10th_delta_delta", "p_value": 0.0,    "drifted": true  },
+    { "feature": "std_Log_energy",       "p_value": 0.9929, "drifted": false }
+  ]
+}
+```
+
+`features` is sorted ascending by p-value (most drifted first). `note` is only present when simulated data was used (fewer than 50 real predictions logged).
+
+**Error:** `404` if drift files don't exist yet — run `python monitoring/drift_check.py` first.
+
+---
+
 ### Error Responses
 
 | Condition | Status | Detail |
@@ -586,6 +614,8 @@ Returns top 5 globally important features by mean absolute SHAP value.
 | `/feature-defaults` missing JSON | `404` | `"Run feature_medians generation first"` |
 | `/model-comparison` no data | `404` | `"No model runs found in MLflow"` |
 | MLflow unreachable | `503` | `"Could not load metrics from MLflow"` |
+| `/drift-status` files missing | `404` | `"Drift data not found. Run drift_check.py first"` |
+| `/drift-status` parse error | `500` | `"Failed to parse drift summary: <message>"` |
 
 ---
 
@@ -602,6 +632,23 @@ Dark-themed single-page application served by FastAPI + Jinja2. No build step �
 | Prediction | `prediction` | `loadPredictionFields()` | 5-input form + result card + SHAP chart + SHAP PNG |
 | Model Comparison | `comparison` | `loadModelComparison()` | Live leaderboard from `/model-comparison` |
 | Feature Insights | `insights` | `loadInsights()` | Biomarker analysis cards from `static/feature_insights.json` |
+| Drift Monitor | `drift` | `loadDriftStatus()` | Status banner, drifted features chart, full feature table from `/drift-status` |
+
+### Drift Monitor Tab (`loadDriftStatus()`)
+
+```
+1. GET /drift-status
+2. Render status banner — green (no drift) or red (>50% drift)
+   - Shows drift %, drifted/total count, progress gauge
+   - Shows last-checked timestamp
+3. If simulated data was used → blue info note
+4. Bar chart of top 15 most drifted features (p-values, Chart.js)
+5. Full feature table with filter buttons: All / Drifted only / Stable only
+   - Each row: feature name, p-value, colored badge (Drifted / Stable)
+6. Bottom callout explaining how drift monitoring works
+```
+
+The tab loads lazily on first click. It does not auto-refresh — re-run `drift_check.py` and reload the tab to update.
 
 ### Prediction Flow (`static/script.js`)
 
