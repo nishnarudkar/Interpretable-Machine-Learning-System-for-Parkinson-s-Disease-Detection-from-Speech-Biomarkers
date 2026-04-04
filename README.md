@@ -337,12 +337,16 @@ subsample        : 0.8
 - Top 20 most influential speech biomarkers plotted to `static/feature_importance.png`
 - Displayed in the Feature Importance tab
 
+![SHAP Feature Importance](static/feature_importance.png)
+
 ### Per-Prediction Explanation
 
 Every `/predict` call returns:
 - Top 10 SHAP feature contributions with actual feature names
 - A server-generated `shap_bar.png` (dark-themed horizontal bar chart)
 - Positive values push toward Parkinson's, negative values push toward Healthy
+
+![Per-Prediction SHAP Explanation](static/shap_bar.png)
 
 ```json
 {
@@ -354,6 +358,8 @@ Every `/predict` call returns:
 ### Learning Curve
 
 Full `ImbPipeline` (SMOTE → SelectFromModel → StandardScaler → model) refitted per CV fold — no leakage. Plots train vs. validation macro F1 with ±1 std confidence bands.
+
+![Learning Curve](static/learning_curve.png)
 
 ---
 
