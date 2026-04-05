@@ -391,7 +391,7 @@ xgb_search = RandomizedSearchCV(
     n_iter=30,
     scoring="f1_macro",
     cv=StratifiedKFold(n_splits=5, shuffle=True, random_state=42),
-    n_jobs=-1,
+    n_jobs=1,   # serial execution — avoids Windows/XGBoost multiprocessing crash
     random_state=42,
     verbose=1,
 )
