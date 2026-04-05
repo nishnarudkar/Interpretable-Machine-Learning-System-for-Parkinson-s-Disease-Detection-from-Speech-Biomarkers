@@ -52,6 +52,7 @@ pipeline {
 
     stage('Build Docker Image') {
       steps {
+        bat 'docker builder prune -f'
         bat 'docker build -t parkinson-api .'
       }
     }
