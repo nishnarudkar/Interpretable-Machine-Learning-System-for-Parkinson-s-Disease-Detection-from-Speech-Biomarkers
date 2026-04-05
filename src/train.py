@@ -125,7 +125,8 @@ print(f"Saved monitoring baseline: {_baseline_path} ({X_train_sel.shape[0]} rows
 
 
 # --------------------------------
-# Scaling (after selection — select → scale order)
+# Scaling — kept for the production XGBoost serving pipeline
+# (scaler is saved as an artifact and used by api/main.py)
 # --------------------------------
 scaler = StandardScaler()
 X_train_sel_scaled = scaler.fit_transform(X_train_sel)
@@ -151,28 +152,28 @@ best_run_id = None
 
 
 # --------------------------------
-# Logistic Regression — RandomizedSearchCV inside ImbPipeline (scaled, no pre-SMOTE)
+# Logistic Regression — RandomizedSearchCV inside ImbPipeline (scaled inside pipeline)
 # --------------------------------
 print("\n--- Tuning Logistic Regression ---")
 lr_pipeline = ImbPipeline([
-    ("smote", SMOTE(random_state=42)),
-    ("lr",    LogisticRegression(random_state=42, max_iter=5000)),
+    ("smote",  SMOTE(random_state=42)),
+    ("scaler", StandardScaler()),
+    ("lr",     LogisticRegression(random_state=42, max_iter=5000)),
 ])
 lr_param_dist = {
     "lr__C":      uniform(0.01, 10),
     "lr__solver": ["lbfgs", "saga"],
-    # penalty removed — deprecated in sklearn 1.8; regularisation controlled by C alone
 }
 lr_search = RandomizedSearchCV(
     lr_pipeline, lr_param_dist, n_iter=20,
     scoring="f1_macro", cv=StratifiedKFold(5, shuffle=True, random_state=42),
     n_jobs=-1, random_state=42, verbose=0
 )
-lr_search.fit(X_train_sel_scaled, y_train)   # raw (unsmoted) train — SMOTE inside pipeline
+lr_search.fit(X_train_sel, y_train)   # unscaled — pipeline handles scaling inside each fold
 best_lr_pipeline = lr_search.best_estimator_
 
-y_pred_lr = best_lr_pipeline.predict(X_test_sel_scaled)
-y_prob_lr = best_lr_pipeline.predict_proba(X_test_sel_scaled)[:, 1]
+y_pred_lr = best_lr_pipeline.predict(X_test_sel)
+y_prob_lr = best_lr_pipeline.predict_proba(X_test_sel)[:, 1]
 lr_metrics = compute_metrics(y_test, y_pred_lr, y_prob_lr)
 
 with mlflow.start_run(run_name="LogisticRegression") as run:
@@ -236,12 +237,13 @@ if rf_metrics["macro_f1"] > best_f1:
 
 
 # --------------------------------
-# SVM — RandomizedSearchCV inside ImbPipeline (scaled)
+# SVM — RandomizedSearchCV inside ImbPipeline (scaled inside pipeline)
 # --------------------------------
 print("\n--- Tuning SVM ---")
 svm_pipeline = ImbPipeline([
-    ("smote", SMOTE(random_state=42)),
-    ("svm",   SVC(probability=True, random_state=42)),
+    ("smote",  SMOTE(random_state=42)),
+    ("scaler", StandardScaler()),
+    ("svm",    SVC(probability=True, random_state=42)),
 ])
 svm_param_dist = {
     "svm__C":      uniform(0.1, 10),
@@ -253,11 +255,11 @@ svm_search = RandomizedSearchCV(
     scoring="f1_macro", cv=StratifiedKFold(5, shuffle=True, random_state=42),
     n_jobs=-1, random_state=42, verbose=0
 )
-svm_search.fit(X_train_sel_scaled, y_train)
+svm_search.fit(X_train_sel, y_train)
 best_svm_pipeline = svm_search.best_estimator_
 
-y_pred_svm = best_svm_pipeline.predict(X_test_sel_scaled)
-y_prob_svm = best_svm_pipeline.predict_proba(X_test_sel_scaled)[:, 1]
+y_pred_svm = best_svm_pipeline.predict(X_test_sel)
+y_prob_svm = best_svm_pipeline.predict_proba(X_test_sel)[:, 1]
 svm_metrics = compute_metrics(y_test, y_pred_svm, y_prob_svm)
 
 with mlflow.start_run(run_name="SVM") as run:
@@ -278,12 +280,13 @@ if svm_metrics["macro_f1"] > best_f1:
 
 
 # --------------------------------
-# KNN — RandomizedSearchCV inside ImbPipeline (scaled)
+# KNN — RandomizedSearchCV inside ImbPipeline (scaled inside pipeline)
 # --------------------------------
 print("\n--- Tuning KNN ---")
 knn_pipeline = ImbPipeline([
-    ("smote", SMOTE(random_state=42)),
-    ("knn",   KNeighborsClassifier()),
+    ("smote",  SMOTE(random_state=42)),
+    ("scaler", StandardScaler()),
+    ("knn",    KNeighborsClassifier()),
 ])
 knn_param_dist = {
     "knn__n_neighbors": randint(3, 20),
@@ -295,11 +298,11 @@ knn_search = RandomizedSearchCV(
     scoring="f1_macro", cv=StratifiedKFold(5, shuffle=True, random_state=42),
     n_jobs=-1, random_state=42, verbose=0
 )
-knn_search.fit(X_train_sel_scaled, y_train)
+knn_search.fit(X_train_sel, y_train)
 best_knn_pipeline = knn_search.best_estimator_
 
-y_pred_knn = best_knn_pipeline.predict(X_test_sel_scaled)
-y_prob_knn = best_knn_pipeline.predict_proba(X_test_sel_scaled)[:, 1]
+y_pred_knn = best_knn_pipeline.predict(X_test_sel)
+y_prob_knn = best_knn_pipeline.predict_proba(X_test_sel)[:, 1]
 knn_metrics = compute_metrics(y_test, y_pred_knn, y_prob_knn)
 
 with mlflow.start_run(run_name="KNN") as run:
