@@ -1,10 +1,10 @@
 {
   "top_features": [
-    "tqwt_TKEO_mean_dec_12",
     "tqwt_TKEO_std_dec_13",
-    "tqwt_TKEO_mean_dec_13",
+    "tqwt_TKEO_mean_dec_12",
+    "tqwt_entropy_log_dec_16",
     "std_7th_delta",
-    "tqwt_entropy_log_dec_16"
+    "std_delta_delta_log_energy"
   ],
   "default_values": {
     "gender": 0.5198675496688742,
