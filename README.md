@@ -39,7 +39,7 @@
 
 ---
 
-## Table of Contentss
+## Table of Contents
 
 - [Overview](#overview)
 - [System Architecture](#system-architecture)
