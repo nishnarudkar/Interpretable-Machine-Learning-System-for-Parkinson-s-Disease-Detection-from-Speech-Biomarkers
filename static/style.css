@@ -1895,8 +1895,9 @@ body {
 }
 
 .drift-table .dt-col-feature { text-align: left; }
-.drift-table .dt-col-pval    { text-align: center; width: 110px; }
-.drift-table .dt-col-status  { text-align: center; width: 110px; }
+.drift-table .dt-col-pval    { text-align: center; width: 100px; }
+.drift-table .dt-col-ks      { text-align: center; width: 90px; }
+.drift-table .dt-col-status  { text-align: center; width: 160px; }
 
 .drift-table tbody td {
   padding: 10px 14px;
@@ -1957,6 +1958,12 @@ body {
   background: rgba(52, 211, 153, 0.1);
   color: #6ee7b7;
   border: 1px solid rgba(52, 211, 153, 0.35);
+}
+
+.drift-badge--important {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fcd34d;
+  border: 1px solid rgba(251, 191, 36, 0.4);
 }
 
 /* Error state */

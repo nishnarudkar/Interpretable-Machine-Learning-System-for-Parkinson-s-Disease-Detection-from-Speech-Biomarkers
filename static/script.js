@@ -425,20 +425,30 @@ async function loadDriftStatus() {
     const drifted = s.drifted_count ?? 0;
     const total   = s.total_features ?? 0;
     const pct     = s.drift_pct ?? 0;
-    const isDrift = pct > 50;
+    const severity = s.severity || "Low";
+    const retrain  = s.retrain === "Yes" || s.retrain === true;
+
+    const severityColor = { Low: "ok", Moderate: "warn", High: "alert" };
+    const bannerState   = severityColor[severity] || "ok";
 
     banner.className = "drift-banner";
-    banner.style.borderColor  = isDrift ? "rgba(248,113,113,0.45)" : "rgba(52,211,153,0.45)";
-    banner.style.background   = isDrift ? "rgba(248,113,113,0.06)" : "rgba(52,211,153,0.06)";
-    document.getElementById("drift-status-icon").textContent  = isDrift ? "⚠️" : "✅";
-    document.getElementById("drift-status-label").textContent = s.status || (isDrift ? "Drift Detected" : "No Significant Drift");
+    banner.style.borderColor  = retrain ? "rgba(248,113,113,0.45)" : severity === "Moderate" ? "rgba(251,191,36,0.45)" : "rgba(52,211,153,0.45)";
+    banner.style.background   = retrain ? "rgba(248,113,113,0.06)" : severity === "Moderate" ? "rgba(251,191,36,0.06)" : "rgba(52,211,153,0.06)";
+
+    const icon = retrain ? "⚠️" : severity === "Moderate" ? "⚡" : "✅";
+    const statusLabel = retrain
+      ? `Retraining Recommended — ${severity} Drift`
+      : `${severity} Drift — ${s.retrain_reason || "Monitoring continues"}`;
+
+    document.getElementById("drift-status-icon").textContent  = icon;
+    document.getElementById("drift-status-label").textContent = statusLabel;
     document.getElementById("drift-generated-at").textContent = s.generated_at ? "Last checked: " + s.generated_at : "";
     document.getElementById("drift-pct-value").textContent    = pct.toFixed(1) + "%";
     document.getElementById("drift-gauge-text").textContent   = drifted + " / " + total;
 
     const bar = document.getElementById("drift-gauge-bar");
     bar.style.width      = Math.min(pct, 100) + "%";
-    bar.style.background = isDrift ? "var(--danger-color)" : "var(--success-color)";
+    bar.style.background = retrain ? "var(--danger-color)" : severity === "Moderate" ? "#fbbf24" : "var(--success-color)";
 
     if (s.note) {
       const noteEl = document.getElementById("drift-note");
@@ -521,14 +531,19 @@ function renderDriftTable(features, filter) {
 
   tbody.innerHTML = rows.map(f => {
     const rowClass  = f.drifted ? "dt-row-drifted" : "";
+    const impBadge  = f.important
+      ? '<span class="drift-badge drift-badge--important">Important</span> '
+      : "";
     const badge     = f.drifted
       ? '<span class="drift-badge drift-badge--drifted">Drifted</span>'
       : '<span class="drift-badge drift-badge--stable">Stable</span>';
-    const pDisplay  = f.p_value === 0 ? "< 1e-6" : f.p_value.toExponential(2);
+    const pDisplay  = f.p_display || (f.p_value === 0 ? "< 1e-6" : f.p_value.toExponential(2));
+    const ksDisplay = f.ks_stat !== undefined ? f.ks_stat.toFixed(4) : "—";
     return `<tr class="${rowClass}">
       <td class="dt-col-feature"><span class="dt-feat-name">${escapeHtml(f.feature)}</span></td>
       <td class="dt-col-pval">${pDisplay}</td>
-      <td class="dt-col-status">${badge}</td>
+      <td class="dt-col-ks">${ksDisplay}</td>
+      <td class="dt-col-status">${impBadge}${badge}</td>
     </tr>`;
   }).join("");
 }

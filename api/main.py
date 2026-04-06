@@ -373,24 +373,25 @@ def drift_status():
             line = line.strip()
             m = re.match(r"Total Features\s*:\s*(\d+)", line)
             if m:
-                summary["total_features"] = int(m.group(1))
-                continue
+                summary["total_features"] = int(m.group(1)); continue
             m = re.match(r"Drifted Features\s*:\s*(\d+)", line)
             if m:
-                summary["drifted_count"] = int(m.group(1))
-                continue
+                summary["drifted_count"] = int(m.group(1)); continue
             m = re.match(r"Drift Percentage\s*:\s*([\d.]+)", line)
             if m:
-                summary["drift_pct"] = float(m.group(1))
-                continue
-            m = re.match(r"Generated:\s*(.+)", line)
+                summary["drift_pct"] = float(m.group(1)); continue
+            m = re.match(r"Drift Severity\s*:\s*(.+)", line)
             if m:
-                summary["generated_at"] = m.group(1).strip()
-                continue
-            m = re.match(r"Status:\s*(.+)", line)
+                summary["severity"] = m.group(1).strip(); continue
+            m = re.match(r"Retraining Recommended\s*:\s*(.+)", line)
             if m:
-                summary["status"] = m.group(1).strip()
-                continue
+                summary["retrain"] = m.group(1).strip(); continue
+            m = re.match(r"Retraining Reason\s*:\s*(.+)", line)
+            if m:
+                summary["retrain_reason"] = m.group(1).strip(); continue
+            m = re.match(r"Generated\s*:\s*(.+)", line)
+            if m:
+                summary["generated_at"] = m.group(1).strip(); continue
             if "[NOTE]" in line:
                 summary["note"] = line.replace("[NOTE]", "").strip()
     except Exception as e:
@@ -403,9 +404,12 @@ def drift_status():
             reader = csv.DictReader(f)
             for row in reader:
                 features.append({
-                    "feature": row["feature"],
-                    "p_value": float(row["p_value"]),
-                    "drifted": row["drifted"].strip().lower() == "true",
+                    "feature":   row["feature"],
+                    "ks_stat":   float(row.get("ks_stat", 0)),
+                    "p_value":   float(row["p_value"]),
+                    "p_display": row.get("p_display", str(row["p_value"])),
+                    "drifted":   row["drifted"].strip().lower() == "true",
+                    "important": row.get("important", "false").strip().lower() == "true",
                 })
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse drift details: {e}")
